@@ -79,9 +79,7 @@ After deploying TinyOlly core (step 1 above), instrument your application to sen
 
 Your app can use manual or auto-instrumentation for traces. Use the OpenTelemetry SDK for logs and metrics. The collector will forward everything to TinyOlly's receiver, which stores it in Redis and displays it in the UI.
 
-## Kubernetes (Minikube): Quick Start
-
-You can also run TinyOlly on Kubernetes using Minikube.
+## TinyOlly on Kubernetes (Minikube): Quick Start
 
 ### Prerequisites
 
@@ -153,6 +151,11 @@ cd k8s-demo
 ./deploy.sh
 ```
 
+To clean up the demo:
+```bash
+./cleanup.sh
+```
+
 The demo includes two microservices that automatically generate traffic, showcasing distributed tracing across service boundaries.
 
 ## Running Docker and Kubernetes Simultaneously
@@ -163,7 +166,7 @@ Both environments can run at the same time on the same machine:
 
 Each has its own isolated data and generates independent telemetry streams. Perfect for testing or comparing deployments.
 
-## Features
+## TinyOlly Features
 
 ### Modern UI with Auto-Refresh
 
