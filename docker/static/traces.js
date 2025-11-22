@@ -21,6 +21,7 @@ export function renderTraces(traces) {
         <div class="trace-header-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-secondary); font-weight: bold; font-size: 0.9em; color: var(--text-muted);">
             <div style="flex: 0 0 100px;">Time</div>
             <div style="flex: 0 0 260px;">traceId</div>
+            <div style="flex: 0 0 120px;">Service</div>
             <div style="flex: 0 0 60px; text-align: right;">Spans</div>
             <div style="flex: 0 0 80px;">Duration</div>
             <div style="flex: 0 0 70px;">Method</div>
@@ -69,10 +70,14 @@ export function renderTraces(traces) {
             else if (s.startsWith('5') || s === 'ERR') statusColor = 'var(--error)';
         }
 
+        // Extract service name
+        const serviceName = trace.service_name || trace.root_span_service_name || '-';
+
         return `
             <div class="trace-item" data-trace-id="${trace.trace_id}" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px;">
                 <div class="trace-time" style="font-family: monospace; color: var(--text-muted); flex: 0 0 100px;">${startTime}</div>
                 <div class="trace-id" style="flex: 0 0 260px; font-family: monospace; color: var(--text-muted); font-size: 0.9em;">${displayTraceId}</div>
+                <div class="trace-service" style="flex: 0 0 120px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${serviceName}">${serviceName}</div>
                 <div class="trace-spans" style="flex: 0 0 60px; text-align: right; color: var(--text-muted);">${trace.span_count}</div>
                 <div class="trace-duration" style="flex: 0 0 80px; color: var(--text-muted);">${trace.duration_ms.toFixed(2)}ms</div>
                 <div class="trace-method" style="flex: 0 0 70px; font-weight: bold; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${method}</div>
