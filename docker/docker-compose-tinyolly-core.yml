@@ -37,10 +37,14 @@ services:
     container_name: tinyolly
     ports:
       - "5005:5002"  # Changed to 5005 to avoid conflict with K8s (which uses 5002)
+    volumes:
+      - ./certs:/app/certs:ro  # Mount SSL certificates (optional)
     depends_on:
       - redis
     environment:
       - REDIS_HOST=redis
+      - SSL_CERT=/app/certs/cert.pem
+      - SSL_KEY=/app/certs/key.pem
 
 networks:
   default:

@@ -33,6 +33,35 @@ This starts:
 ./02-stop-core.sh
 ```
 
+### HTTPS Support (Optional)
+
+TinyOlly supports HTTPS with self-signed certificates for local development:
+
+**Generate certificates:**
+```bash
+cd docker
+./generate-certs.sh
+```
+
+**Start with HTTPS:**
+```bash
+./01-start-core.sh
+```
+
+The UI will automatically detect and use SSL certificates if they exist in `docker/certs/`.
+
+- **With HTTPS**: `https://localhost:5005`
+- **Without HTTPS**: `http://localhost:5005`
+
+**Note**: Self-signed certificates will trigger browser security warnings. This is expected for local development. Click "Advanced" → "Proceed to localhost" to continue.
+
+**Remove HTTPS:**
+```bash
+rm -rf docker/certs/
+```
+
+Then restart TinyOlly to revert to HTTP.
+
 ### 2. Deploy Demo Apps (Optional)
 
 Deploy two Flask microservices with automatic traffic generation:

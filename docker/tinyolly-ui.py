@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import json
 import time
+import os
 from datetime import datetime
 import uuid
 from tinyolly_redis_storage import Storage
@@ -187,5 +188,20 @@ def health():
         return jsonify({'status': 'unhealthy', 'redis': 'disconnected'}), 503
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    print("Starting TinyOlly UI...")
+    
+    # Check if SSL certificates exist
+    cert_file = os.getenv('SSL_CERT', '/app/certs/cert.pem')
+    key_file = os.getenv('SSL_KEY', '/app/certs/key.pem')
+    
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        print(f"✓ SSL enabled: https://localhost:5002")
+        print(f"  Certificate: {cert_file}")
+        print(f"  Key: {key_file}")
+        app.run(host='0.0.0.0', port=5002, debug=True, ssl_context=(cert_file, key_file))
+    else:
+        print("✓ HTTP mode: http://localhost:5002")
+        print("  (SSL certificates not found, running without HTTPS)")
+        app.run(host='0.0.0.0', port=5002, debug=True)
+
 
