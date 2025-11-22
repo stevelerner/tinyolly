@@ -13,11 +13,15 @@ export function renderLogs(logs, containerId = 'logs-container') {
         return;
     }
 
+    // Preserve current search filter
+    const searchInput = document.getElementById('log-search');
+    const currentFilter = searchInput ? searchInput.value : '';
+
     const limitNote = '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">Showing last 50 logs</div>';
 
     // Build table with headers
     const headerRow = `
-        <div style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 2px solid var(--border-color); background: var(--bg-secondary); font-weight: bold; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+        <div class="log-header-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 2px solid var(--border-color); background: var(--bg-secondary); font-weight: bold; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
             <div style="flex: 0 0 100px;">Time</div>
             <div style="flex: 0 0 120px;">ServiceName</div>
             <div style="flex: 0 0 60px;">Severity</div>
@@ -41,7 +45,7 @@ export function renderLogs(logs, containerId = 'logs-container') {
         const spanId = log.spanId || log.span_id;
         
         return `
-            <div class="log-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
+            <div class="log-row" style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
                 <div style="flex: 0 0 100px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${timestamp}</div>
                 <div style="flex: 0 0 120px; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.service_name || ''}">${log.service_name || '-'}</div>
                 <div style="flex: 0 0 60px; font-weight: 600; font-size: 10px; color: var(--text-main);">${severity}</div>
@@ -57,6 +61,11 @@ export function renderLogs(logs, containerId = 'logs-container') {
     }).join('');
 
     container.innerHTML = limitNote + headerRow + logsHtml;
+    
+    // Re-apply search filter if one was active
+    if (currentFilter) {
+        setTimeout(() => filterLogs(), 10);
+    }
     
     // Add click handlers using event delegation
     container.addEventListener('click', (e) => {
@@ -106,3 +115,64 @@ export function renderLogs(logs, containerId = 'logs-container') {
     });
 }
 
+export function clearLogFilter() {
+    const filterInput = document.getElementById('trace-id-filter');
+    const searchInput = document.getElementById('log-search');
+    if (filterInput) {
+        filterInput.value = '';
+    }
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    // Show all logs
+    const logRows = document.querySelectorAll('.log-row');
+    logRows.forEach(row => {
+        row.style.display = '';
+    });
+}
+
+// Filter logs based on search input (searches all log content)
+export function filterLogs() {
+    const searchInput = document.getElementById('log-search');
+    if (!searchInput) return;
+    
+    const filter = searchInput.value.toLowerCase();
+    const logRows = document.querySelectorAll('.log-row');
+    const container = document.getElementById('logs-container');
+    
+    // Remove any existing "no results" message
+    const existingNoResults = container.querySelector('.no-search-results');
+    if (existingNoResults) {
+        existingNoResults.remove();
+    }
+    
+    // If filter is empty, show all logs
+    if (!filter) {
+        logRows.forEach(row => {
+            row.style.display = '';
+        });
+        return;
+    }
+    
+    let visibleCount = 0;
+    logRows.forEach(row => {
+        // Get all text content from the row (includes service, severity, trace/span IDs, message)
+        const rowText = row.textContent.toLowerCase();
+        
+        if (rowText.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Show "no results" message if nothing matches
+    if (visibleCount === 0 && logRows.length > 0) {
+        const noResults = document.createElement('div');
+        noResults.className = 'no-search-results';
+        noResults.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;';
+        noResults.textContent = `No logs match "${searchInput.value}"`;
+        container.appendChild(noResults);
+    }
+}

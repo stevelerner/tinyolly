@@ -983,8 +983,9 @@
         <!-- Logs Tab -->
         <div id="logs-content" class="tab-content active">
             <div class="logs-controls">
-                <input type="text" id="trace-id-filter" placeholder="Filter by trace ID (optional)">
-                <button onclick="loadLogs()">Filter</button>
+                <input type="text" id="log-search" placeholder="Search logs (any text in message, service, trace/span IDs)" onkeyup="filterLogs()">
+                <input type="text" id="trace-id-filter" placeholder="Filter by trace ID (optional)" style="display:none;">
+                <button onclick="loadLogs()" style="display:none;">Filter</button>
                 <button onclick="clearLogFilter()">Clear</button>
             </div>
             <div class="log-list" id="logs-container">

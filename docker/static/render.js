@@ -3,7 +3,7 @@
 // Import and re-export from specialized modules
 export { renderTraces, showTraceDetail, showTracesList, toggleTraceJSON, copyTraceJSON, downloadTraceJSON, showLogsForTrace } from './traces.js';
 export { renderSpans, isSpanDetailOpen } from './spans.js';
-export { renderLogs, clearLogFilter } from './logs.js';
+export { renderLogs, clearLogFilter, filterLogs } from './logs.js';
 export { renderMetrics, isMetricChartOpen, filterMetrics } from './metrics.js';
 export { renderServiceMap } from './serviceMap.js';
 
