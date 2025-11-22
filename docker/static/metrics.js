@@ -288,15 +288,15 @@ function renderGaugeChart(metricName, canvas, dataPoints) {
                 const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2 + 20;
                 
                 ctx.save();
-                ctx.font = 'bold 24px Inter';
+                ctx.font = 'bold 18px Inter';
                 ctx.fillStyle = 'rgb(59, 130, 246)';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(currentValue.toFixed(2), centerX, centerY);
                 
-                ctx.font = '12px Inter';
+                ctx.font = '11px Inter';
                 ctx.fillStyle = 'var(--text-muted)';
-                ctx.fillText(`/ ${maxValue.toFixed(0)}`, centerX, centerY + 20);
+                ctx.fillText(`/ ${maxValue.toFixed(0)}`, centerX, centerY + 16);
                 ctx.restore();
             }
         }]
@@ -306,35 +306,49 @@ function renderGaugeChart(metricName, canvas, dataPoints) {
 function renderCounterChart(metricName, canvas, dataPoints) {
     const chartId = canvas.id;
     
-    // Prepare chart data
-    const labels = dataPoints.map(point => {
-        const date = new Date(point.timestamp * 1000);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    });
+    // For counters, calculate the rate per second (industry standard)
+    // This handles resets gracefully and shows actual request rate
     
-    let values = dataPoints.map(point => {
-        return point.value !== undefined ? point.value : 0;
-    });
+    const labels = [];
+    const rates = [];
     
-    // For counters, calculate rate (delta between points)
-    const rates = [0]; // First point has no previous value
-    for (let i = 1; i < values.length; i++) {
-        const delta = values[i] - values[i - 1];
-        // Handle counter resets (when value drops)
-        rates.push(delta >= 0 ? delta : values[i]);
+    for (let i = 1; i < dataPoints.length; i++) {
+        const prevPoint = dataPoints[i - 1];
+        const currPoint = dataPoints[i];
+        
+        const prevValue = prevPoint.value || 0;
+        const currValue = currPoint.value || 0;
+        const timeDelta = currPoint.timestamp - prevPoint.timestamp;
+        
+        // Calculate rate per second
+        let rate = 0;
+        if (timeDelta > 0) {
+            const valueDelta = currValue - prevValue;
+            // If counter reset (value went down), treat current value as the delta
+            const actualDelta = valueDelta >= 0 ? valueDelta : currValue;
+            rate = actualDelta / timeDelta;
+        }
+        
+        const date = new Date(currPoint.timestamp * 1000);
+        labels.push(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        rates.push(rate);
     }
     
-    // Create chart using Chart.js and store the instance
+    // Create smooth line chart showing rate per second
     chartInstances[chartId] = new Chart(canvas, {
-        type: 'bar',
+        type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: `${metricName} (rate per interval)`,
+                label: `${metricName} per second`,
                 data: rates,
-                backgroundColor: 'rgba(59, 130, 246, 0.6)',
                 borderColor: 'rgb(59, 130, 246)',
-                borderWidth: 1
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 1,
+                pointHoverRadius: 3
             }]
         },
         options: {
@@ -346,7 +360,7 @@ function renderCounterChart(metricName, canvas, dataPoints) {
                 },
                 title: {
                     display: true,
-                    text: `${metricName} - Rate of Change`,
+                    text: `${metricName} - Request Rate`,
                     font: {
                         size: 12
                     }
@@ -356,7 +370,7 @@ function renderCounterChart(metricName, canvas, dataPoints) {
                     intersect: false,
                     callbacks: {
                         label: function(context) {
-                            return `Change: ${context.parsed.y.toFixed(2)}`;
+                            return `${context.parsed.y.toFixed(2)} req/sec`;
                         }
                     }
                 }
@@ -375,16 +389,18 @@ function renderCounterChart(metricName, canvas, dataPoints) {
                 y: {
                     display: true,
                     beginAtZero: true,
-                    grace: '5%',
+                    grace: '10%',
                     grid: {
                         color: 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        precision: 0
+                        callback: function(value) {
+                            return value.toFixed(1) + '/s';
+                        }
                     },
                     title: {
                         display: true,
-                        text: 'Change per interval'
+                        text: 'Requests per Second'
                     }
                 }
             }

@@ -11,20 +11,15 @@ echo "  - Redis"
 echo "  - TinyOlly Frontend (web UI)"
 echo ""
 
-# Check if SSL certificates exist, offer to generate
-if [ ! -f "certs/cert.pem" ] || [ ! -f "certs/key.pem" ]; then
-    echo "SSL certificates not found."
-    echo "Generate self-signed certificates for HTTPS? (y/N)"
-    read -t 5 -n 1 GENERATE_CERTS
-    echo ""
-    
-    if [ "$GENERATE_CERTS" == "y" ] || [ "$GENERATE_CERTS" == "Y" ]; then
+# Check for --ssl flag
+if [ "$1" == "--ssl" ]; then
+    if [ ! -f "certs/cert.pem" ] || [ ! -f "certs/key.pem" ]; then
         echo "Generating SSL certificates..."
         chmod +x generate-certs.sh
         ./generate-certs.sh
         echo ""
     else
-        echo "Skipping SSL certificate generation. TinyOlly will run on HTTP."
+        echo "SSL certificates already exist."
         echo ""
     fi
 fi
@@ -67,4 +62,7 @@ else
 fi
 
 echo "  3. Stop services:    ./02-stop-core.sh"
+echo ""
+echo "Options:"
+echo "  --ssl    Generate SSL certificates for HTTPS"
 echo ""

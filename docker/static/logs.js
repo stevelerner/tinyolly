@@ -87,25 +87,20 @@ export function renderLogs(logs, containerId = 'logs-container') {
                 if (window.switchTab) {
                     window.switchTab('spans');
                 }
-                // Wait for spans to load, then find and show the span detail
-                setTimeout(async () => {
-                    // Load spans data
-                    try {
-                        const response = await fetch('/api/spans');
-                        const spans = await response.json();
-                        
-                        // Find the span - we need to import from api or do it directly
-                        const span = spans.find(s => s.span_id === spanId);
-                        if (span) {
-                            // We need access to showSpanDetail from spans.js
-                            // This creates a circular dependency issue
-                            // For now, we'll just switch to the tab and let the user click
-                            console.log('Switched to spans tab - click span to view details');
-                        }
-                    } catch (err) {
-                        console.error('Error loading span:', err);
+                
+                // Wait for spans to load, then find and click the span row
+                setTimeout(() => {
+                    // Find the span row by its data-span-id attribute
+                    const spanRow = document.querySelector(`.trace-item[data-span-id="${spanId}"]`);
+                    if (spanRow) {
+                        // Programmatically click the span row to open its detail
+                        spanRow.click();
+                        // Scroll to the span
+                        spanRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                        console.log(`Span ${spanId} not found in current spans view`);
                     }
-                }, 200);
+                }, 300); // Give more time for spans to render
             }
         }
     });
