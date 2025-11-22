@@ -28,6 +28,11 @@ This starts:
 
 **Open the UI:** `http://localhost:5005` (empty until you send data)
 
+**Optional HTTPS:** Add `--ssl` flag to enable HTTPS with self-signed certificates:
+```bash
+./01-start-core.sh --ssl
+```
+
 **Stop core services:**
 ```bash
 ./02-stop-core.sh
@@ -35,32 +40,22 @@ This starts:
 
 ### HTTPS Support (Optional)
 
-TinyOlly supports HTTPS with self-signed certificates for local development:
+TinyOlly supports HTTPS with self-signed certificates for local development. Use the `--ssl` flag:
 
-**Generate certificates:**
 ```bash
 cd docker
-./generate-certs.sh
+./01-start-core.sh --ssl
 ```
 
-**Start with HTTPS:**
-```bash
-./01-start-core.sh
-```
+This automatically generates certificates (if needed) and starts the UI with HTTPS at `https://localhost:5005`.
 
-The UI will automatically detect and use SSL certificates if they exist in `docker/certs/`.
+**Note**: Self-signed certificates trigger browser security warnings. This is expected. Click "Advanced" → "Proceed to localhost" to continue.
 
-- **With HTTPS**: `https://localhost:5005`
-- **Without HTTPS**: `http://localhost:5005`
-
-**Note**: Self-signed certificates will trigger browser security warnings. This is expected for local development. Click "Advanced" → "Proceed to localhost" to continue.
-
-**Remove HTTPS:**
+**Revert to HTTP:**
 ```bash
 rm -rf docker/certs/
+./01-start-core.sh
 ```
-
-Then restart TinyOlly to revert to HTTP.
 
 ### 2. Deploy Demo Apps (Optional)
 
@@ -187,7 +182,7 @@ cd k8s-demo
 ./deploy.sh
 ```
 
-The demo includes two microservices that automatically generate traffic, showcasing distributed tracing across service boundaries. See [k8s-demo/README.md](k8s-demo/README.md) for details.
+The demo includes two microservices that automatically generate traffic, showcasing distributed tracing across service boundaries.
 
 ## Running Docker and Kubernetes Simultaneously
 
@@ -228,13 +223,14 @@ TinyOlly uses **type-specific visualizations** for OpenTelemetry metrics:
 - **Visualization**: Doughnut chart (180°) with current value displayed prominently
 - **Example**: `http.server.active_requests` shows current concurrent requests
 
-#### **Counters** → Rate Bar Chart
-- **What it shows**: Rate of change between measurement intervals
+#### **Counters** → Rate Per Second Chart
+- **What it shows**: Requests per second (throughput rate)
 - **Best for**: `requests.total`, `errors.total`, `bytes.sent`, cumulative counts
-- **Why**: OTLP counters are cumulative - displaying raw values creates sawtooth patterns
-- **Visualization**: Bar chart showing deltas (change per interval)
-- **Handles**: Counter resets when application restarts
-- **Example**: `frontend.requests.total` shows request rate over time
+- **Why**: OTLP counters are cumulative - showing raw values creates confusing patterns
+- **Visualization**: Smooth line chart showing rate/sec with shaded area fill
+- **Handles**: Counter resets gracefully when application restarts
+- **Industry standard**: This is how Prometheus, Grafana, and Datadog display counters
+- **Example**: `frontend.requests.total` shows "15.2 req/sec" as a smooth trend line
 
 #### **Histograms** → Bucket Distribution
 - **What it shows**: Distribution of values across predefined buckets
