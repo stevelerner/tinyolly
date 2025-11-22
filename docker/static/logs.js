@@ -2,7 +2,7 @@ import { formatTraceId } from './utils.js';
 
 export function renderLogs(logs, containerId = 'logs-container') {
     const container = document.getElementById(containerId);
-    
+
     if (!container) {
         console.error(`Container ${containerId} not found`);
         return;
@@ -32,20 +32,20 @@ export function renderLogs(logs, containerId = 'logs-container') {
     `;
 
     const logsHtml = logs.map(log => {
-        const timestamp = new Date(log.timestamp * 1000).toLocaleTimeString([], { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit', 
-            fractionalSecondDigits: 3 
+        const timestamp = new Date(log.timestamp * 1000).toLocaleTimeString([], {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            fractionalSecondDigits: 3
         });
-        
+
         const severity = log.severity || 'INFO';
         const traceId = log.traceId || log.trace_id;
         const spanId = log.spanId || log.span_id;
-        
+
         return `
-            <div class="log-row" style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
+            <div class="log-row" style="display: flex; flex-direction: row; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
                 <div style="flex: 0 0 100px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${timestamp}</div>
                 <div style="flex: 0 0 120px; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.service_name || ''}">${log.service_name || '-'}</div>
                 <div style="flex: 0 0 60px; font-weight: 600; font-size: 10px; color: var(--text-main);">${severity}</div>
@@ -61,12 +61,12 @@ export function renderLogs(logs, containerId = 'logs-container') {
     }).join('');
 
     container.innerHTML = limitNote + headerRow + logsHtml;
-    
+
     // Re-apply search filter if one was active
     if (currentFilter) {
         setTimeout(() => filterLogs(), 10);
     }
-    
+
     // Add click handlers using event delegation
     container.addEventListener('click', (e) => {
         // Handle trace link clicks
@@ -84,19 +84,19 @@ export function renderLogs(logs, containerId = 'logs-container') {
             }
             return;
         }
-        
+
         // Handle span link clicks
         const spanLink = e.target.closest('.log-span-link');
         if (spanLink) {
             e.preventDefault();
             const spanId = spanLink.dataset.spanId;
-            
+
             if (spanId) {
                 // Switch to spans tab
                 if (window.switchTab) {
                     window.switchTab('spans');
                 }
-                
+
                 // Wait for spans to load, then find and click the span row
                 setTimeout(() => {
                     // Find the span row by its data-span-id attribute
@@ -127,7 +127,7 @@ export function clearLogFilter() {
     // Show all logs
     const logRows = document.querySelectorAll('.log-row');
     logRows.forEach(row => {
-        row.style.display = '';
+        row.classList.remove('hidden');
     });
 }
 
@@ -135,44 +135,23 @@ export function clearLogFilter() {
 export function filterLogs() {
     const searchInput = document.getElementById('log-search');
     if (!searchInput) return;
-    
-    const filter = searchInput.value.toLowerCase();
+
+    const filter = searchInput.value.toLowerCase().trim();
     const logRows = document.querySelectorAll('.log-row');
-    const container = document.getElementById('logs-container');
-    
-    // Remove any existing "no results" message
-    const existingNoResults = container.querySelector('.no-search-results');
-    if (existingNoResults) {
-        existingNoResults.remove();
-    }
-    
-    // If filter is empty, show all logs
+
     if (!filter) {
-        logRows.forEach(row => {
-            row.style.display = '';
-        });
+        // Show all logs
+        logRows.forEach(row => row.classList.remove('hidden'));
         return;
     }
-    
-    let visibleCount = 0;
+
+    // Hide/show rows based on filter
     logRows.forEach(row => {
-        // Get all text content from the row (includes service, severity, trace/span IDs, message)
-        const rowText = row.textContent.toLowerCase();
-        
-        if (rowText.includes(filter)) {
-            row.style.display = '';
-            visibleCount++;
+        const text = row.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            row.classList.remove('hidden');
         } else {
-            row.style.display = 'none';
+            row.classList.add('hidden');
         }
     });
-    
-    // Show "no results" message if nothing matches
-    if (visibleCount === 0 && logRows.length > 0) {
-        const noResults = document.createElement('div');
-        noResults.className = 'no-search-results';
-        noResults.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-style: italic;';
-        noResults.textContent = `No logs match "${searchInput.value}"`;
-        container.appendChild(noResults);
-    }
 }

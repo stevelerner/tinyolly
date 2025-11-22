@@ -549,12 +549,16 @@
         }
 
         .log-row {
-            display: flex !important;
-            flex-direction: row !important;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .log-row.hidden {
+            display: none !important;
         }
 
         .log-row > div {
-            display: block !important;
+            display: block;
         }
 
         .log-item {
@@ -992,7 +996,7 @@
         <!-- Logs Tab -->
         <div id="logs-content" class="tab-content active">
             <div class="logs-controls">
-                <input type="text" id="log-search" placeholder="Search logs (any text in message, service, trace/span IDs)" onkeyup="filterLogs()">
+                <input type="text" id="log-search" placeholder="Search logs (any text in message, service, trace/span IDs)">
                 <input type="text" id="trace-id-filter" placeholder="Filter by trace ID (optional)" style="display:none;">
                 <button onclick="loadLogs()" style="display:none;">Filter</button>
                 <button onclick="clearLogFilter()">Clear</button>
@@ -1072,7 +1076,7 @@
         <span id="refresh-icon">⏸</span>
     </button>
 
-    <script type="module" src="/static/tinyolly.js"></script>
+    <script type="module" src="/static/tinyolly.js?v=20251122b"></script>
 </body>
 
 </html>
