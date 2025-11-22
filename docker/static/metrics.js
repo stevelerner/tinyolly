@@ -29,8 +29,13 @@ export async function renderMetrics(metricsData) {
             let latestValue = '-';
             let metricType = 'Metric';
             
+            let labels = {};
+            
             if (data.data && data.data.length > 0) {
                 const point = data.data[data.data.length - 1];
+                
+                // Extract labels if present
+                labels = point.labels || {};
                 
                 console.log(`Metric: ${name}, point.type="${point.type}", point.histogram=${point.histogram !== undefined}, point.value=${point.value}`);
                 
@@ -88,12 +93,25 @@ export async function renderMetrics(metricsData) {
             if (metricType === 'Counter') typeBadgeClass = 'metric-type-counter';
             else if (metricType === 'Histogram') typeBadgeClass = 'metric-type-histogram';
             
+            // Build labels HTML (badges)
+            let labelsHtml = '';
+            if (labels && Object.keys(labels).length > 0) {
+                labelsHtml = '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">';
+                for (const [key, value] of Object.entries(labels)) {
+                    labelsHtml += `<span style="font-size: 10px; padding: 2px 6px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 3px; color: var(--text-muted); font-family: monospace;">${key}="${value}"</span>`;
+                }
+                labelsHtml += '</div>';
+            }
+            
             const chartId = `chart-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
             
             const row = `
                 <div class="metric-row" data-metric-name="${name}" data-metric-type="${metricType.toLowerCase()}">
                     <div class="metric-header">
-                        <div class="metric-cell metric-col-name">${name}</div>
+                        <div class="metric-cell metric-col-name">
+                            <div>${name}</div>
+                            ${labelsHtml}
+                        </div>
                         <div class="metric-cell metric-col-type">
                             <span class="metric-type-badge ${typeBadgeClass}">${metricType}</span>
                         </div>
