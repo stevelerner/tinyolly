@@ -211,6 +211,8 @@ Both Docker and Kubernetes demos include built-in automatic traffic generation:
 - **Tab persistence**: Remembers which tab you were viewing
 - **Copy/Download**: Export trace and log JSON with one click
 - **Interactive metrics**: Expandable graphs with search and filtering
+- **Metric labels**: Display metric attributes/labels as inline badges (e.g., `endpoint="/api"`, `method="GET"`)
+- **Service names**: ServiceName column on traces, spans, and logs for easy service identification
 - **Data limits**: Shows last 100 logs, 50 traces to prevent browser overload
 
 ### Metric Visualization Types
@@ -238,6 +240,12 @@ TinyOlly uses **type-specific visualizations** for OpenTelemetry metrics:
 - **Visualization**: Bar chart of request counts per latency bucket
 - **Display**: Latest snapshot showing "X req, avg: Y ms" in list view
 - **Example**: `http.server.duration` shows how many requests fall into each latency range (0-10ms, 10-50ms, etc.)
+
+#### **Metric Labels/Attributes**
+- **Display**: Labels appear as inline badges below the metric name
+- **Format**: `key="value"` (e.g., `endpoint="/api/users"`, `method="GET"`, `status="200"`)
+- **Use case**: Track metrics with multiple dimensions (per-endpoint, per-method, per-status)
+- **Example**: A single counter `http.requests.total` can have labels for different endpoints, showing separate badge sets for each label combination
 
 **Note**: Metric types are automatically detected from OTLP data. The UI displays the appropriate visualization based on the metric's semantic type.
 

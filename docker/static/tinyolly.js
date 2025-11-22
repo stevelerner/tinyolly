@@ -7,7 +7,8 @@ import {
     toggleTraceJSON,
     copyTraceJSON,
     downloadTraceJSON,
-    showLogsForTrace
+    showLogsForTrace,
+    filterMetrics
 } from './render.js';
 
 // Expose functions to global scope for HTML onclick handlers
@@ -21,6 +22,7 @@ window.copyTraceJSON = copyTraceJSON;
 window.downloadTraceJSON = downloadTraceJSON;
 window.showLogsForTrace = showLogsForTrace;
 window.loadLogs = loadLogs; // Needed for filter button
+window.filterMetrics = filterMetrics;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {

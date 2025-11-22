@@ -634,3 +634,32 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
         }
     });
 }
+
+// Filter metrics based on search input (searches both metric name and labels)
+export function filterMetrics() {
+    const searchInput = document.getElementById('metric-search');
+    if (!searchInput) return;
+    
+    const filter = searchInput.value.toLowerCase();
+    const metricRows = document.querySelectorAll('.metric-row');
+    
+    metricRows.forEach(row => {
+        const metricName = row.getAttribute('data-metric-name') || '';
+        
+        // Get all label text from the row
+        const labelElements = row.querySelectorAll('.metric-col-name span[style*="font-family: monospace"]');
+        let labelText = '';
+        labelElements.forEach(label => {
+            labelText += ' ' + label.textContent;
+        });
+        
+        // Search in both metric name and labels
+        const searchText = (metricName + ' ' + labelText).toLowerCase();
+        
+        if (searchText.includes(filter)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
