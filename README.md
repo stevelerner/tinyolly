@@ -69,29 +69,15 @@ cd docker
 ./02-stop-core.sh
 ```
 
-### Using TinyOlly Core with Your Own Apps
+### Using TinyOlly Core for Docker Desktop on Mac (or equivalent) with Your Own Apps
 
 After deploying TinyOlly core (step 1 above), instrument your application to send telemetry:
 
 **Point your OpenTelemetry exporter to:**
-- **gRPC**: `http://localhost:4317`
-- **HTTP**: `http://localhost:4318`
+- **gRPC**: `http://otel-collector:4317`
+- **HTTP**: `http://otel-collector:4318`
 
 Your app can use manual or auto-instrumentation for traces. Use the OpenTelemetry SDK for logs and metrics. The collector will forward everything to TinyOlly's receiver, which stores it in Redis and displays it in the UI.
-
-## Architecture
-
-```
-Demo Frontend  ←→  Demo Backend (distributed tracing + auto-traffic)
-        ↓                    ↓
-   OTel Collector  ←─────────┘
-        ↓
-   TinyOlly OTLP Receiver (parses OTLP, stores in Redis)
-        ↓
-   Redis (30-minute TTL with cardinality protection)
-        ↓
-   TinyOlly UI (Flask + HTML + JavaScript)
-```
 
 ## Kubernetes (Minikube): Quick Start
 
@@ -146,6 +132,16 @@ You can also run TinyOlly on Kubernetes using Minikube.
 
     ```bash
     ./k8s/cleanup.sh
+    ```
+
+    Shut down Minikube:
+    ```bash
+    minikube stop
+    ```
+    
+    Minikube may be more stable if you delete it:
+    ```bash
+    minikube delete
     ```
 
 ### Demo Applications (Optional)
@@ -236,6 +232,20 @@ docker run -e MAX_METRIC_CARDINALITY=2000 ...
 See [docs/CARDINALITY-PROTECTION.md](docs/CARDINALITY-PROTECTION.md) for detailed documentation.
 
 ## Technical Details
+
+## Architecture
+
+```
+Demo Frontend  ←→  Demo Backend (distributed tracing + auto-traffic)
+        ↓                    ↓
+   OTel Collector  ←─────────┘
+        ↓
+   TinyOlly OTLP Receiver (parses OTLP, stores in Redis)
+        ↓
+   Redis (30-minute TTL with cardinality protection)
+        ↓
+   TinyOlly UI (Flask + HTML + JavaScript)
+```
 
 ### Frontend Architecture
 
