@@ -2,7 +2,7 @@
 
 A **lightweight observability system built from scratch** to visualize and correlate logs, metrics, and traces. No 3rd party Observability tools are used - just Flask, Redis, and Chart.js.  
 
-Think of TinyOlly as a local lightweight tool to livetail your metrics/traces/logs during development with visuals and tools like a full production observability system.
+Think of TinyOlly as a local tool to livetail your metrics/traces/logs during development like a full production observability system.
 
 Included is a demo app with two Flask microservices using Otel auto-instrumentation for tracing and SDK for logs and metrics. 
 
@@ -23,15 +23,9 @@ This starts:
 - **OTel Collector**: Listening on `localhost:4317` (gRPC) and `localhost:4318` (HTTP)
 - **TinyOlly UI**: `http://localhost:5005`
 - **TinyOlly OTLP Receiver and its Redis storage**: OTLP observability back end and storage
-
-**Note:** The script automatically rebuilds images if code changes are detected.
+- Rebuilds images if code changes are detected.
 
 **Open the UI:** `http://localhost:5005` (empty until you send data)
-
-**Optional HTTPS:** Add `--ssl` flag to enable HTTPS with self-signed certificates:
-```bash
-./01-start-core.sh --ssl
-```
 
 **Stop core services:**
 ```bash
@@ -40,17 +34,13 @@ This starts:
 
 ### HTTPS Support (Optional)
 
-TinyOlly supports HTTPS with self-signed certificates for local development. Use the `--ssl` flag:
+TinyOlly supports HTTPS with self-signed certificates for local development. Use the `--ssl` flag.   
+Self-signed certificates trigger browser security warnings. This is expected. Click "Advanced" → "Proceed to localhost" to continue.  
 
 ```bash
 cd docker
 ./01-start-core.sh --ssl
 ```
-
-This automatically generates certificates (if needed) and starts the UI with HTTPS at `https://localhost:5005`.
-
-**Note**: Self-signed certificates trigger browser security warnings. This is expected. Click "Advanced" → "Proceed to localhost" to continue.
-
 **Revert to HTTP:**
 ```bash
 rm -rf docker/certs/
@@ -67,8 +57,6 @@ cd docker-demo
 ```
 
 Wait 30 seconds. **The demo apps automatically generate traffic** - traces, logs, and metrics will appear in the UI!
-
-**Note:** The script automatically rebuilds images if code changes are detected.
 
 **Stop demo apps:**
 ```bash
@@ -104,19 +92,6 @@ Demo Frontend  ←→  Demo Backend (distributed tracing + auto-traffic)
         ↓
    TinyOlly UI (Flask + HTML + JavaScript)
 ```
-
-**Demo: Key Points:**
-- **Automatic traffic generation** - demo apps continuously generate telemetry (no manual scripts needed)
-- Apps use **automatic OpenTelemetry instrumentation** - no manual span creation
-- HTTP calls between services automatically create distributed traces
-- Apps only speak OTLP - they don't know TinyOlly exists
-- Standard observability pipeline architecture
-- **Add any container that emits OpenTelemetry and TinyOlly will display its telemetry**
-
-**Demo Endpoints:**
-- `/process-order` - Complex multi-service flow (inventory, pricing, payment)
-- `/hello`, `/calculate`, `/error` - Simple endpoints
-- All endpoints generate logs, metrics, and traces
 
 ## Kubernetes (Minikube): Quick Start
 
@@ -194,16 +169,6 @@ Each has its own isolated data and generates independent telemetry streams. Perf
 
 ## Features
 
-### Automatic Traffic Generation
-
-Both Docker and Kubernetes demos include built-in automatic traffic generation:
-- Starts automatically when demo apps launch
-- Generates traces, logs, and metrics every 3-8 seconds
-- Calls various endpoints: `/hello`, `/calculate`, `/process-order`, `/error`
-- No manual scripts needed - just start and watch!
-
-**Optional manual traffic scripts are available in each demo directory if you want to generate additional load.**
-
 ### Modern UI with Auto-Refresh
 
 - **Modular architecture**: Separate HTML and JavaScript files for maintainability
@@ -213,6 +178,8 @@ Both Docker and Kubernetes demos include built-in automatic traffic generation:
 - **Interactive metrics**: Expandable graphs with search and filtering
 - **Metric labels**: Display metric attributes/labels as inline badges (e.g., `endpoint="/api"`, `method="GET"`)
 - **Service names**: ServiceName column on traces, spans, and logs for easy service identification
+- **Log Search**: Filter logs by message content, service name, or trace/span IDs
+- **Log JSON View**: Click any log row to view, copy, or download the full JSON log entry
 - **Data limits**: Shows last 100 logs, 50 traces to prevent browser overload
 
 ### Metric Visualization Types

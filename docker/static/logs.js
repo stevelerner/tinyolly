@@ -1,7 +1,16 @@
-import { formatTraceId } from './utils.js';
+import { formatTraceId, copyToClipboard, downloadJson } from './utils.js';
+
+let currentLogs = [];
+let selectedLogIndex = null;
 
 export function renderLogs(logs, containerId = 'logs-container') {
     const container = document.getElementById(containerId);
+    currentLogs = logs;
+    selectedLogIndex = null;
+
+    // Clear JSON view when rendering new logs
+    const jsonContainer = document.getElementById('log-json-container');
+    if (jsonContainer) jsonContainer.innerHTML = '';
 
     if (!container) {
         console.error(`Container ${containerId} not found`);
@@ -31,7 +40,7 @@ export function renderLogs(logs, containerId = 'logs-container') {
         </div>
     `;
 
-    const logsHtml = logs.map(log => {
+    const logsHtml = logs.map((log, index) => {
         const timestamp = new Date(log.timestamp * 1000).toLocaleTimeString([], {
             hour12: false,
             hour: '2-digit',
@@ -45,7 +54,7 @@ export function renderLogs(logs, containerId = 'logs-container') {
         const spanId = log.spanId || log.span_id;
 
         return `
-            <div class="log-row" style="display: flex; flex-direction: row; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
+            <div class="log-row" data-log-index="${index}" style="display: flex; flex-direction: row; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px; cursor: pointer;">
                 <div style="flex: 0 0 100px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${timestamp}</div>
                 <div style="flex: 0 0 120px; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.service_name || ''}">${log.service_name || '-'}</div>
                 <div style="flex: 0 0 60px; font-weight: 600; font-size: 10px; color: var(--text-main);">${severity}</div>
@@ -73,6 +82,7 @@ export function renderLogs(logs, containerId = 'logs-container') {
         const traceLink = e.target.closest('.log-trace-link');
         if (traceLink) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent row click
             const traceId = traceLink.dataset.traceId;
             if (traceId && window.showTraceDetail) {
                 // Switch to traces tab first
@@ -89,6 +99,7 @@ export function renderLogs(logs, containerId = 'logs-container') {
         const spanLink = e.target.closest('.log-span-link');
         if (spanLink) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent row click
             const spanId = spanLink.dataset.spanId;
 
             if (spanId) {
@@ -111,8 +122,79 @@ export function renderLogs(logs, containerId = 'logs-container') {
                     }
                 }, 300); // Give more time for spans to render
             }
+            return;
+        }
+
+        // Handle log row click
+        const logRow = e.target.closest('.log-row');
+        if (logRow) {
+            const index = parseInt(logRow.dataset.logIndex);
+            showLogJson(index);
         }
     });
+}
+
+function showLogJson(index) {
+    if (!currentLogs || !currentLogs[index]) return;
+
+    const log = currentLogs[index];
+    const container = document.getElementById('log-json-container');
+    if (!container) return;
+
+    // Highlight selected row
+    document.querySelectorAll('.log-row').forEach((row, idx) => {
+        if (idx === index) {
+            row.style.background = 'var(--bg-hover)';
+        } else {
+            row.style.background = '';
+        }
+    });
+
+    selectedLogIndex = index;
+
+    container.innerHTML = `
+        <div class="log-json-view" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-main);">
+                    Log Details
+                    <span style="font-weight: normal; color: var(--text-muted); font-size: 0.9em; margin-left: 8px; font-family: 'JetBrains Mono', monospace;">
+                        ${new Date(log.timestamp * 1000).toLocaleString()}
+                    </span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="copy-log-json-btn" style="padding: 6px 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); border-radius: 4px; font-size: 12px;">
+                        Copy JSON
+                    </button>
+                    <button id="download-log-json-btn" style="padding: 6px 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); border-radius: 4px; font-size: 12px;">
+                        Download JSON
+                    </button>
+                    <button id="close-log-json-btn" style="padding: 6px 12px; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-main); border-radius: 4px; font-size: 12px;">
+                        Close
+                    </button>
+                    <span id="copy-log-json-feedback" style="color: var(--success-text); font-size: 12px; display: none; margin-left: 8px;">Copied!</span>
+                </div>
+            </div>
+            <div style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; overflow: auto; max-height: 500px;">
+                <pre style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-main); margin: 0; white-space: pre-wrap; word-wrap: break-word; line-height: 1.5;">${JSON.stringify(log, null, 2)}</pre>
+            </div>
+        </div>
+    `;
+
+    // Attach handlers for the buttons
+    document.getElementById('copy-log-json-btn').onclick = () => {
+        const feedback = document.getElementById('copy-log-json-feedback');
+        copyToClipboard(JSON.stringify(log, null, 2), feedback);
+    };
+
+    document.getElementById('download-log-json-btn').onclick = () => {
+        downloadJson(log, `log-${log.timestamp}.json`);
+    };
+
+    document.getElementById('close-log-json-btn').onclick = () => {
+        container.innerHTML = '';
+        document.querySelectorAll('.log-row').forEach(row => row.style.background = '');
+        selectedLogIndex = null;
+    };
 }
 
 export function clearLogFilter() {
@@ -154,4 +236,8 @@ export function filterLogs() {
             row.classList.add('hidden');
         }
     });
+}
+
+export function isLogJsonOpen() {
+    return selectedLogIndex !== null;
 }

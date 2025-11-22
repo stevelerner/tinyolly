@@ -54,7 +54,7 @@ export function startAutoRefresh() {
             console.log('Skipping refresh - span detail is open');
             return;
         }
-        
+
         // Don't refresh metrics if a chart is open
         if (currentTab === 'metrics') {
             import('./metrics.js').then(module => {
@@ -69,7 +69,13 @@ export function startAutoRefresh() {
         } else if (currentTab === 'spans') {
             loadSpans();
         } else if (currentTab === 'logs') {
-            loadLogs();
+            import('./render.js').then(module => {
+                if (module.isLogJsonOpen && module.isLogJsonOpen()) {
+                    console.log('Skipping refresh - log JSON is open');
+                } else {
+                    loadLogs();
+                }
+            });
         } else if (currentTab === 'map') {
             loadServiceMap();
         }
