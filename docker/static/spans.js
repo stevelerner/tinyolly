@@ -23,9 +23,9 @@ export function renderSpans(spans) {
     const headerRow = `
         <div class="trace-header-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-secondary); font-weight: bold; font-size: 0.9em; color: var(--text-muted);">
             <div style="flex: 0 0 100px;">Time</div>
+            <div style="flex: 0 0 120px;">ServiceName</div>
             <div style="flex: 0 0 260px;">traceId</div>
             <div style="flex: 0 0 180px;">spanId</div>
-            <div style="flex: 0 0 120px;">Service</div>
             <div style="flex: 0 0 80px;">Duration</div>
             <div style="flex: 0 0 70px;">Method</div>
             <div style="flex: 1;">Route / URL</div>
@@ -79,9 +79,9 @@ export function renderSpans(spans) {
             <div class="span-row-wrapper">
                 <div class="trace-item" data-span-id="${span.span_id}" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; cursor: pointer;">
                     <div class="trace-time" style="font-family: monospace; color: var(--text-muted); flex: 0 0 100px;">${startTime}</div>
+                    <div class="span-service" style="flex: 0 0 120px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${serviceName}">${serviceName}</div>
                     <div class="trace-id" style="flex: 0 0 260px; font-family: monospace; color: var(--text-muted); font-size: 0.9em;">${displayTraceId}</div>
                     <div class="span-id" style="flex: 0 0 180px; font-family: monospace; color: var(--text-muted); font-size: 0.9em;">${displaySpanId}</div>
-                    <div class="span-service" style="flex: 0 0 120px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${serviceName}">${serviceName}</div>
                     <div class="trace-duration" style="flex: 0 0 80px; color: var(--text-muted);">${span.duration_ms.toFixed(2)}ms</div>
                     <div class="trace-method" style="flex: 0 0 70px; font-weight: bold; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${method}</div>
                     <div class="trace-name" style="flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${route}</div>

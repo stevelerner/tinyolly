@@ -132,7 +132,8 @@ class Storage:
             'scheme': scheme,
             'host': host,
             'target': target,
-            'url': url
+            'url': url,
+            'service_name': span.get('serviceName', 'unknown')
         }
 
     def get_trace_spans(self, trace_id):
@@ -194,6 +195,7 @@ class Storage:
             root_span_host = get_attr(root_span, ['http.host', 'net.host.name'])
             root_span_target = get_attr(root_span, ['http.target', 'url.path'])
             root_span_url = get_attr(root_span, ['http.url', 'url.full'])
+            root_span_service_name = root_span.get('serviceName', 'unknown')
             
         return {
             'trace_id': trace_id,
@@ -209,7 +211,8 @@ class Storage:
             'root_span_scheme': root_span_scheme,
             'root_span_host': root_span_host,
             'root_span_target': root_span_target,
-            'root_span_url': root_span_url
+            'root_span_url': root_span_url,
+            'service_name': root_span_service_name
         }
 
     # ============================================

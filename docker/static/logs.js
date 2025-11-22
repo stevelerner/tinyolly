@@ -19,8 +19,8 @@ export function renderLogs(logs, containerId = 'logs-container') {
     const headerRow = `
         <div style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 2px solid var(--border-color); background: var(--bg-secondary); font-weight: bold; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
             <div style="flex: 0 0 100px;">Time</div>
+            <div style="flex: 0 0 120px;">ServiceName</div>
             <div style="flex: 0 0 60px;">Severity</div>
-            <div style="flex: 0 0 120px;">Service</div>
             <div style="flex: 0 0 180px;">traceId</div>
             <div style="flex: 0 0 140px;">spanId</div>
             <div style="flex: 1; min-width: 200px;">Message</div>
@@ -43,8 +43,8 @@ export function renderLogs(logs, containerId = 'logs-container') {
         return `
             <div class="log-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 11px;">
                 <div style="flex: 0 0 100px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">${timestamp}</div>
-                <div style="flex: 0 0 60px; font-weight: 600; font-size: 10px; color: var(--text-main);">${severity}</div>
                 <div style="flex: 0 0 120px; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.service_name || ''}">${log.service_name || '-'}</div>
+                <div style="flex: 0 0 60px; font-weight: 600; font-size: 10px; color: var(--text-main);">${severity}</div>
                 <div style="flex: 0 0 180px; font-family: 'JetBrains Mono', monospace; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${traceId || ''}">
                     ${traceId ? `<a class="log-trace-link" data-trace-id="${traceId}" style="color: var(--primary); cursor: pointer; text-decoration: none; font-family: 'JetBrains Mono', monospace;">${formatTraceId(traceId)}</a>` : '<span style="color: var(--text-muted);">-</span>'}
                 </div>
