@@ -118,6 +118,33 @@
             background: var(--bg-hover);
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .docs-link {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .docs-link:hover {
+            background: var(--bg-hover);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .tab-stat {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -979,10 +1006,16 @@
                     <div class="subtitle">Lightweight Observability For OpenTelemetry - Logs, Metrics & Traces</div>
                 </div>
             </div>
-            <button class="theme-toggle" onclick="toggleTheme()">
-                <span id="theme-icon">🌙</span>
-                <span id="theme-text">Dark Mode</span>
-            </button>
+            <div class="header-controls">
+                <a href="https://github.com/stevelerner/tinyolly" target="_blank" class="docs-link">
+                    <span>📖</span>
+                    <span>Docs</span>
+                </a>
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-text">Dark Mode</span>
+                </button>
+            </div>
         </div>
     </header>
 
