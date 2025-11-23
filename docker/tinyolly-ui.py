@@ -6,6 +6,7 @@ and provides a web UI for visualization and correlation.
 
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from flask_compress import Compress
 import json
 import time
 import os
@@ -15,6 +16,7 @@ from tinyolly_redis_storage import Storage
 
 app = Flask(__name__)
 CORS(app)
+Compress(app)
 
 # Initialize storage
 storage = Storage()

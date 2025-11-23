@@ -206,12 +206,7 @@ export function isMetricChartOpen() {
 
 async function renderMetricChart(metricName, canvas, metricType) {
     try {
-        // Destroy existing chart instance if it exists
         const chartId = canvas.id;
-        if (chartInstances[chartId]) {
-            chartInstances[chartId].destroy();
-            delete chartInstances[chartId];
-        }
 
         // Fetch metric data for the last 10 minutes
         const endTime = Date.now() / 1000;
@@ -221,6 +216,12 @@ async function renderMetricChart(metricName, canvas, metricType) {
         const data = await response.json();
 
         if (!data.data || data.data.length === 0) {
+            // If chart exists, destroy it to show empty state
+            if (chartInstances[chartId]) {
+                chartInstances[chartId].destroy();
+                delete chartInstances[chartId];
+            }
+
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = 'var(--text-muted)';
@@ -236,19 +237,21 @@ async function renderMetricChart(metricName, canvas, metricType) {
 
         console.log(`Chart for ${metricName}: metricType=${metricType}, firstPoint.type=${firstPoint.type}, actualType=${actualType}`);
 
-        // Route to appropriate visualization
+        // Check if chart instance exists and is of the same type
+        // Note: We simplify by only reusing if it's the same visualization function
+        // Ideally we would check chart.config.type but our render functions handle different chart types
+
+        // For now, we'll implement reuse within the specific render functions or pass the instance
+        // But to keep it clean, let's just pass the data to the render functions and let them handle update vs create
+
         const typeLower = actualType.toLowerCase();
         if (typeLower === 'histogram') {
-            console.log(`Rendering histogram for ${metricName}`);
             renderHistogramChart(metricName, canvas, data.data);
         } else if (typeLower === 'gauge') {
-            console.log(`Rendering gauge for ${metricName}`);
             renderGaugeChart(metricName, canvas, data.data);
         } else if (typeLower === 'counter') {
-            console.log(`Rendering counter for ${metricName}`);
             renderCounterChart(metricName, canvas, data.data);
         } else {
-            console.log(`Rendering line chart for ${metricName}, type: ${typeLower}`);
             renderLineChart(metricName, canvas, data.data, actualType);
         }
     } catch (error) {
@@ -260,6 +263,27 @@ async function renderMetricChart(metricName, canvas, metricType) {
         ctx.textAlign = 'center';
         ctx.fillText('Error loading chart', canvas.width / 2, 75);
     }
+}
+
+function updateChartData(chart, labels, datasets) {
+    chart.data.labels = labels;
+
+    // Update datasets
+    datasets.forEach((newDataset, i) => {
+        if (chart.data.datasets[i]) {
+            chart.data.datasets[i].data = newDataset.data;
+            // Update other properties if needed
+        } else {
+            chart.data.datasets.push(newDataset);
+        }
+    });
+
+    // Remove extra datasets
+    if (chart.data.datasets.length > datasets.length) {
+        chart.data.datasets.splice(datasets.length);
+    }
+
+    chart.update('none'); // 'none' mode for performance
 }
 
 function renderGaugeChart(metricName, canvas, dataPoints) {
@@ -447,26 +471,40 @@ function renderLineChart(metricName, canvas, dataPoints, metricType) {
         return point.value !== undefined ? point.value : 0;
     });
 
+    const dataset = {
+        label: metricName,
+        data: values,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        tension: 0.4,
+        fill: true,
+        pointRadius: 2,
+        pointHoverRadius: 4
+    };
+
+    // Check if we can reuse existing chart
+    if (chartInstances[chartId] && chartInstances[chartId].config.type === 'line') {
+        updateChartData(chartInstances[chartId], labels, [dataset]);
+        return;
+    }
+
+    // Destroy if exists but wrong type
+    if (chartInstances[chartId]) {
+        chartInstances[chartId].destroy();
+    }
+
     // Create chart using Chart.js and store the instance
     chartInstances[chartId] = new Chart(canvas, {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                label: metricName,
-                data: values,
-                borderColor: 'rgb(59, 130, 246)',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true,
-                pointRadius: 2,
-                pointHoverRadius: 4
-            }]
+            datasets: [dataset]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false, // Disable initial animation for better performance
             plugins: {
                 legend: {
                     display: false
