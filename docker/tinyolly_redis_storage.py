@@ -5,10 +5,43 @@ Handles all Redis interactions for traces, logs, and metrics.
 import zlib
 import base64
 
-# ... (imports)
+import json
+import time
+import uuid
+import redis
+import os
+
+# Default configuration
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+# Use REDIS_PORT_NUMBER to avoid conflict with K8s auto-generated REDIS_PORT variable
+# K8s creates REDIS_PORT with value like "tcp://10.107.63.144:6379"
+REDIS_PORT = int(os.getenv('REDIS_PORT_NUMBER', os.getenv('REDIS_PORT_OVERRIDE', '6379')))
+TTL_SECONDS = int(os.getenv('REDIS_TTL', 1800))  # 30 minutes default (configurable)
+MAX_METRIC_CARDINALITY = int(os.getenv('MAX_METRIC_CARDINALITY', 1000))  # Prevent cardinality explosion
 
 class Storage:
-    # ... (init)
+    def __init__(self, host=REDIS_HOST, port=REDIS_PORT, ttl=TTL_SECONDS, max_cardinality=MAX_METRIC_CARDINALITY):
+        # Use connection pool for better performance
+        # Add retry logic for stability
+        self.pool = redis.ConnectionPool(
+            host=host, 
+            port=port, 
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            retry_on_timeout=True,
+            health_check_interval=30
+        )
+        self.client = redis.Redis(connection_pool=self.pool)
+        self.ttl = ttl
+        self.max_cardinality = max_cardinality
+
+    def is_connected(self):
+        try:
+            self.client.ping()
+            return True
+        except:
+            return False
 
     def _compress_if_needed(self, data_str):
         """Compress data if larger than 1KB"""
@@ -90,7 +123,13 @@ class Storage:
         except redis.RedisError as e:
             print(f"Redis error in store_span: {e}")
 
-    # ... (get_recent_traces, get_recent_spans)
+    def get_recent_traces(self, limit=100):
+        """Get recent trace IDs"""
+        return self.client.zrevrange('trace_index', 0, limit - 1)
+
+    def get_recent_spans(self, limit=100):
+        """Get recent span IDs"""
+        return self.client.zrevrange('span_index', 0, limit - 1)
 
     def get_span_details(self, span_id):
         """Get details for a specific span"""
@@ -171,7 +210,80 @@ class Storage:
             print(f"Error getting trace spans: {e}")
             return []
 
-    # ... (get_trace_summary)
+    def get_trace_summary(self, trace_id):
+        """Get summary of a trace"""
+        spans = self.get_trace_spans(trace_id)
+        if not spans:
+            return None
+            
+        # Calculate trace duration
+        start_times = [int(s.get('startTimeUnixNano', s.get('start_time', 0))) for s in spans]
+        end_times = [int(s.get('endTimeUnixNano', s.get('end_time', 0))) for s in spans]
+        
+        min_start = min(start_times) if start_times else 0
+        max_end = max(end_times) if end_times else 0
+        duration_ns = max_end - min_start
+        
+        # Find root span (no parent)
+        root_span = next((s for s in spans if not s.get('parentSpanId') and not s.get('parent_span_id')), spans[0] if spans else None)
+        
+        # Extract root span details
+        root_span_method = None
+        root_span_route = None
+        root_span_status_code = None
+        root_span_server_name = None
+        root_span_scheme = None
+        root_span_host = None
+        root_span_target = None
+        root_span_url = None
+        root_span_service_name = None
+        
+        if root_span:
+            # Helper to get attribute value
+            def get_attr(span, keys):
+                attributes = span.get('attributes', [])
+                # Handle both list of dicts (OTLP) and dict (if normalized)
+                if isinstance(attributes, list):
+                    for attr in attributes:
+                        if attr.get('key') in keys:
+                            val = attr.get('value', {})
+                            if 'stringValue' in val: return val['stringValue']
+                            if 'intValue' in val: return val['intValue']
+                            if 'boolValue' in val: return val['boolValue']
+                            return str(val)
+                elif isinstance(attributes, dict):
+                    for key in keys:
+                        if key in attributes:
+                            return attributes[key]
+                return None
+
+            root_span_method = get_attr(root_span, ['http.method', 'http.request.method'])
+            root_span_route = get_attr(root_span, ['http.route', 'http.target', 'url.path'])
+            root_span_status_code = get_attr(root_span, ['http.status_code', 'http.response.status_code'])
+            root_span_server_name = get_attr(root_span, ['http.server_name', 'net.host.name'])
+            root_span_scheme = get_attr(root_span, ['http.scheme', 'url.scheme'])
+            root_span_host = get_attr(root_span, ['http.host', 'net.host.name'])
+            root_span_target = get_attr(root_span, ['http.target', 'url.path'])
+            root_span_url = get_attr(root_span, ['http.url', 'url.full'])
+            root_span_service_name = root_span.get('serviceName', 'unknown')
+            
+        return {
+            'trace_id': trace_id,
+            'span_count': len(spans),
+            'duration_ms': duration_ns / 1_000_000 if duration_ns else 0,
+            'start_time': min_start,
+            'root_span_name': root_span.get('name', 'unknown') if root_span else 'unknown',
+            'root_span_method': root_span_method,
+            'root_span_route': root_span_route,
+            'root_span_status_code': root_span_status_code,
+            'root_span_status': root_span.get('status', {}) if root_span else {},
+            'root_span_server_name': root_span_server_name,
+            'root_span_scheme': root_span_scheme,
+            'root_span_host': root_span_host,
+            'root_span_target': root_span_target,
+            'root_span_url': root_span_url,
+            'service_name': root_span_service_name
+        }
 
     # ============================================
     # Log Storage
