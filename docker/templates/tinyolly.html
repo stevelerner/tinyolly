@@ -11,7 +11,6 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --bg-body: #f8fafc;
@@ -584,7 +583,7 @@
             display: none !important;
         }
 
-        .log-row > div {
+        .log-row>div {
             display: block;
         }
 
@@ -1032,8 +1031,10 @@
         <!-- Logs Tab -->
         <div id="logs-content" class="tab-content active">
             <div class="logs-controls">
-                <input type="text" id="log-search" placeholder="Search logs (any text in message, service, trace/span IDs)">
-                <input type="text" id="trace-id-filter" placeholder="Filter by trace ID (optional)" style="display:none;">
+                <input type="text" id="log-search"
+                    placeholder="Search logs (any text in message, service, trace/span IDs)">
+                <input type="text" id="trace-id-filter" placeholder="Filter by trace ID (optional)"
+                    style="display:none;">
                 <button onclick="loadLogs()" style="display:none;">Filter</button>
                 <button onclick="clearLogFilter()">Clear</button>
             </div>
@@ -1090,7 +1091,7 @@
         <!-- Metrics Tab -->
         <div id="metrics-content" class="tab-content">
             <div style="margin-bottom: 15px;">
-                <input type="text" id="metric-search" placeholder="Search metrics..." onkeyup="filterMetrics()"
+                <input type="text" id="metric-search" placeholder="Search metrics..."
                     style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);">
             </div>
             <div class="metric-table" id="metrics-container">

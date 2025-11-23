@@ -1,3 +1,5 @@
+import { loadChartJs } from './utils.js';
+
 export async function renderMetrics(metricsData) {
     const container = document.getElementById('metrics-container');
 
@@ -25,20 +27,20 @@ export async function renderMetrics(metricsData) {
         try {
             const response = await fetch(`/api/metrics/${name}?limit=1`);
             const data = await response.json();
-            
+
             let latestValue = '-';
             let metricType = 'Metric';
-            
+
             let labels = {};
-            
+
             if (data.data && data.data.length > 0) {
                 const point = data.data[data.data.length - 1];
-                
+
                 // Extract labels if present
                 labels = point.labels || {};
-                
+
                 console.log(`Metric: ${name}, point.type="${point.type}", point.histogram=${point.histogram !== undefined}, point.value=${point.value}`);
-                
+
                 // Determine metric type - prioritize the 'type' field from OTLP receiver
                 if (point.type) {
                     // Normalize type to title case
@@ -53,9 +55,9 @@ export async function renderMetrics(metricsData) {
                     const hasCurrent = name.includes('.current') || name.includes('_current');
                     const hasTotal = name.includes('.total') || name.includes('_total');
                     const hasCount = name.includes('.count') || name.includes('_count');
-                    
+
                     console.log(`  → Name heuristics: .active=${hasActive}, .current=${hasCurrent}, .total=${hasTotal}, .count=${hasCount}`);
-                    
+
                     if (hasActive || hasCurrent) {
                         metricType = 'Gauge';
                     } else if (hasTotal || hasCount) {
@@ -64,9 +66,9 @@ export async function renderMetrics(metricsData) {
                         metricType = 'Gauge';
                     }
                 }
-                
+
                 console.log(`  → Final detected type: ${metricType}`);
-                
+
                 // Extract the actual value for display
                 if (point.histogram !== undefined) {
                     // For histograms, show count and average
@@ -87,12 +89,12 @@ export async function renderMetrics(metricsData) {
                     latestValue = '-';
                 }
             }
-            
+
             // Determine type badge class
             let typeBadgeClass = 'metric-type-gauge';
             if (metricType === 'Counter') typeBadgeClass = 'metric-type-counter';
             else if (metricType === 'Histogram') typeBadgeClass = 'metric-type-histogram';
-            
+
             // Build labels HTML (badges)
             let labelsHtml = '';
             if (labels && Object.keys(labels).length > 0) {
@@ -102,9 +104,9 @@ export async function renderMetrics(metricsData) {
                 }
                 labelsHtml += '</div>';
             }
-            
+
             const chartId = `chart-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-            
+
             const row = `
                 <div class="metric-row" data-metric-name="${name}" data-metric-type="${metricType.toLowerCase()}">
                     <div class="metric-header">
@@ -128,13 +130,13 @@ export async function renderMetrics(metricsData) {
                     </div>
                 </div>
             `;
-            
+
             container.innerHTML += row;
         } catch (error) {
             console.error(`Error fetching metric ${name}:`, error);
-            
+
             const chartId = `chart-${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-            
+
             // Still show the metric name even if we can't fetch data
             const row = `
                 <div class="metric-row" data-metric-name="${name}" data-metric-type="${metricType.toLowerCase()}">
@@ -156,31 +158,37 @@ export async function renderMetrics(metricsData) {
                     </div>
                 </div>
             `;
-            
+
             container.innerHTML += row;
         }
     }
-    
+
     // Add click handlers to toggle metric charts
     container.querySelectorAll('.metric-row').forEach(row => {
         const header = row.querySelector('.metric-header');
         const metricName = row.dataset.metricName;
         const metricType = row.dataset.metricType; // Get type from data attribute
-        
+
         header.addEventListener('click', async () => {
             const isExpanded = row.classList.contains('expanded');
-            
+
             if (isExpanded) {
                 row.classList.remove('expanded');
             } else {
                 row.classList.add('expanded');
-                
+
                 // Load and render chart if not already loaded
                 const chartCanvas = row.querySelector('canvas');
                 if (chartCanvas && !chartCanvas.dataset.loaded) {
-                    console.log(`Rendering chart for ${metricName}, type from data-attribute: ${metricType}`);
-                    await renderMetricChart(metricName, chartCanvas, metricType);
-                    chartCanvas.dataset.loaded = 'true';
+                    // Lazy load Chart.js
+                    try {
+                        await loadChartJs();
+                        console.log(`Rendering chart for ${metricName}, type from data-attribute: ${metricType}`);
+                        await renderMetricChart(metricName, chartCanvas, metricType);
+                        chartCanvas.dataset.loaded = 'true';
+                    } catch (err) {
+                        console.error('Failed to load Chart.js:', err);
+                    }
                 }
             }
         });
@@ -204,14 +212,14 @@ async function renderMetricChart(metricName, canvas, metricType) {
             chartInstances[chartId].destroy();
             delete chartInstances[chartId];
         }
-        
+
         // Fetch metric data for the last 10 minutes
         const endTime = Date.now() / 1000;
         const startTime = endTime - 600; // 10 minutes ago
-        
+
         const response = await fetch(`/api/metrics/${metricName}?start=${startTime}&end=${endTime}`);
         const data = await response.json();
-        
+
         if (!data.data || data.data.length === 0) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -221,13 +229,13 @@ async function renderMetricChart(metricName, canvas, metricType) {
             ctx.fillText('No data available', canvas.width / 2, 75);
             return;
         }
-        
+
         // Determine the metric type from data if not provided
         const firstPoint = data.data[0];
         const actualType = metricType || firstPoint.type || 'gauge';
-        
+
         console.log(`Chart for ${metricName}: metricType=${metricType}, firstPoint.type=${firstPoint.type}, actualType=${actualType}`);
-        
+
         // Route to appropriate visualization
         const typeLower = actualType.toLowerCase();
         if (typeLower === 'histogram') {
@@ -258,11 +266,11 @@ function renderGaugeChart(metricName, canvas, dataPoints) {
     const chartId = canvas.id;
     const latestPoint = dataPoints[dataPoints.length - 1];
     const currentValue = latestPoint.value !== undefined ? latestPoint.value : 0;
-    
+
     // Determine max value from historical data
     const allValues = dataPoints.map(p => p.value || 0);
     const maxValue = Math.max(...allValues, currentValue * 1.2); // Add 20% headroom
-    
+
     // Create a doughnut chart to simulate a gauge
     chartInstances[chartId] = new Chart(canvas, {
         type: 'doughnut',
@@ -304,14 +312,14 @@ function renderGaugeChart(metricName, canvas, dataPoints) {
                 const ctx = chart.ctx;
                 const centerX = chart.chartArea.left + (chart.chartArea.right - chart.chartArea.left) / 2;
                 const centerY = chart.chartArea.top + (chart.chartArea.bottom - chart.chartArea.top) / 2 + 20;
-                
+
                 ctx.save();
                 ctx.font = 'bold 18px Inter';
                 ctx.fillStyle = 'rgb(59, 130, 246)';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(currentValue.toFixed(2), centerX, centerY);
-                
+
                 ctx.font = '11px Inter';
                 ctx.fillStyle = 'var(--text-muted)';
                 ctx.fillText(`/ ${maxValue.toFixed(0)}`, centerX, centerY + 16);
@@ -323,21 +331,21 @@ function renderGaugeChart(metricName, canvas, dataPoints) {
 
 function renderCounterChart(metricName, canvas, dataPoints) {
     const chartId = canvas.id;
-    
+
     // For counters, calculate the rate per second (industry standard)
     // This handles resets gracefully and shows actual request rate
-    
+
     const labels = [];
     const rates = [];
-    
+
     for (let i = 1; i < dataPoints.length; i++) {
         const prevPoint = dataPoints[i - 1];
         const currPoint = dataPoints[i];
-        
+
         const prevValue = prevPoint.value || 0;
         const currValue = currPoint.value || 0;
         const timeDelta = currPoint.timestamp - prevPoint.timestamp;
-        
+
         // Calculate rate per second
         let rate = 0;
         if (timeDelta > 0) {
@@ -346,12 +354,12 @@ function renderCounterChart(metricName, canvas, dataPoints) {
             const actualDelta = valueDelta >= 0 ? valueDelta : currValue;
             rate = actualDelta / timeDelta;
         }
-        
+
         const date = new Date(currPoint.timestamp * 1000);
         labels.push(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         rates.push(rate);
     }
-    
+
     // Create smooth line chart showing rate per second
     chartInstances[chartId] = new Chart(canvas, {
         type: 'line',
@@ -387,7 +395,7 @@ function renderCounterChart(metricName, canvas, dataPoints) {
                     mode: 'index',
                     intersect: false,
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             return `${context.parsed.y.toFixed(2)} req/sec`;
                         }
                     }
@@ -412,7 +420,7 @@ function renderCounterChart(metricName, canvas, dataPoints) {
                         color: 'rgba(0, 0, 0, 0.1)'
                     },
                     ticks: {
-                        callback: function(value) {
+                        callback: function (value) {
                             return value.toFixed(1) + '/s';
                         }
                     },
@@ -428,17 +436,17 @@ function renderCounterChart(metricName, canvas, dataPoints) {
 
 function renderLineChart(metricName, canvas, dataPoints, metricType) {
     const chartId = canvas.id;
-    
+
     // Prepare chart data
     const labels = dataPoints.map(point => {
         const date = new Date(point.timestamp * 1000);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     });
-    
+
     const values = dataPoints.map(point => {
         return point.value !== undefined ? point.value : 0;
     });
-    
+
     // Create chart using Chart.js and store the instance
     chartInstances[chartId] = new Chart(canvas, {
         type: 'line',
@@ -503,7 +511,7 @@ function renderLineChart(metricName, canvas, dataPoints, metricType) {
 function renderHistogramChart(metricName, canvas, dataPoints) {
     const chartId = canvas.id;
     const latestPoint = dataPoints[dataPoints.length - 1];
-    
+
     // Get bucket data from histogram structure
     let buckets = [];
     if (latestPoint.histogram && latestPoint.histogram.buckets) {
@@ -511,21 +519,21 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
     } else if (latestPoint.buckets) {
         buckets = latestPoint.buckets;
     }
-    
+
     if (buckets.length === 0) {
         // Fallback to line chart showing count over time
         const labels = dataPoints.map(point => {
             const date = new Date(point.timestamp * 1000);
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         });
-        
+
         const counts = dataPoints.map(point => {
             if (point.histogram && point.histogram.count !== undefined) {
                 return point.histogram.count;
             }
             return point.count || 0;
         });
-        
+
         chartInstances[chartId] = new Chart(canvas, {
             type: 'line',
             data: {
@@ -558,7 +566,7 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
         });
         return;
     }
-    
+
     // Create bar chart for histogram buckets
     const labels = buckets.map(b => {
         const bound = b.bound !== undefined ? b.bound : b.upper_bound !== undefined ? b.upper_bound : b.upperBound;
@@ -567,9 +575,9 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
         }
         return bound.toFixed(2);
     });
-    
+
     const counts = buckets.map(b => b.count || 0);
-    
+
     chartInstances[chartId] = new Chart(canvas, {
         type: 'bar',
         data: {
@@ -598,7 +606,7 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
                 },
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label === '∞' ? '> previous bound' : `≤ ${context.label}ms`;
                             return `Count: ${context.parsed.y} ${label}`;
                         }
@@ -639,23 +647,23 @@ function renderHistogramChart(metricName, canvas, dataPoints) {
 export function filterMetrics() {
     const searchInput = document.getElementById('metric-search');
     if (!searchInput) return;
-    
+
     const filter = searchInput.value.toLowerCase();
     const metricRows = document.querySelectorAll('.metric-row');
-    
+
     metricRows.forEach(row => {
         const metricName = row.getAttribute('data-metric-name') || '';
-        
+
         // Get all label text from the row
         const labelElements = row.querySelectorAll('.metric-col-name span[style*="font-family: monospace"]');
         let labelText = '';
         labelElements.forEach(label => {
             labelText += ' ' + label.textContent;
         });
-        
+
         // Search in both metric name and labels
         const searchText = (metricName + ' ' + labelText).toLowerCase();
-        
+
         if (searchText.includes(filter)) {
             row.style.display = '';
         } else {

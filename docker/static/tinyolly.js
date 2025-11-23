@@ -13,6 +13,8 @@ import {
     filterLogs
 } from './render.js';
 
+import { debounce } from './utils.js';
+
 // Expose functions to global scope for HTML onclick handlers IMMEDIATELY
 // (before DOMContentLoaded so they're available for inline event handlers)
 window.switchTab = switchTab;
@@ -36,11 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     loadStats();
 
-    // Attach log search event listener
+    // Attach log search event listener with debounce
     const logSearch = document.getElementById('log-search');
     if (logSearch) {
-        logSearch.addEventListener('keyup', filterLogs);
-        console.log('✓ Log search listener attached');
+        logSearch.addEventListener('keyup', debounce(filterLogs, 300));
+        console.log('✓ Log search listener attached (debounced)');
+    }
+
+    // Attach metric search event listener with debounce
+    const metricSearch = document.getElementById('metric-search');
+    if (metricSearch) {
+        metricSearch.addEventListener('keyup', debounce(filterMetrics, 300));
+        console.log('✓ Metric search listener attached (debounced)');
     }
 
     if (localStorage.getItem('tinyolly-auto-refresh') !== 'false') {

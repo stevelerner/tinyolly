@@ -18,7 +18,9 @@ MAX_METRIC_CARDINALITY = int(os.getenv('MAX_METRIC_CARDINALITY', 1000))  # Preve
 
 class Storage:
     def __init__(self, host=REDIS_HOST, port=REDIS_PORT, ttl=TTL_SECONDS, max_cardinality=MAX_METRIC_CARDINALITY):
-        self.client = redis.Redis(host=host, port=port, decode_responses=True)
+        # Use connection pool for better performance
+        self.pool = redis.ConnectionPool(host=host, port=port, decode_responses=True)
+        self.client = redis.Redis(connection_pool=self.pool)
         self.ttl = ttl
         self.max_cardinality = max_cardinality
 
@@ -45,29 +47,35 @@ class Storage:
         # We want to support both OTLP format (camelCase) and internal format
         # This is a simplified normalization
         
+        # Use pipeline for batch writes
+        pipe = self.client.pipeline()
+        
         # Store individual span
         span_key = f"span:{span_id}"
-        self.client.setex(span_key, self.ttl, json.dumps(span))
+        pipe.setex(span_key, self.ttl, json.dumps(span))
         
         # Add span to trace set (for existence check)
         trace_key = f"trace:{trace_id}"
-        self.client.sadd(trace_key, span_id)
-        self.client.expire(trace_key, self.ttl)
+        pipe.sadd(trace_key, span_id)
+        pipe.expire(trace_key, self.ttl)
         
         # Add to trace index (sorted by time)
-        self.client.zadd('trace_index', {trace_id: time.time()})
-        self.client.expire('trace_index', self.ttl)
+        pipe.zadd('trace_index', {trace_id: time.time()})
+        pipe.expire('trace_index', self.ttl)
         
         # Add to trace's list of spans (for retrieval)
         trace_span_key = f"trace:{trace_id}:spans"
         # We use rpush to append to the end, preserving order if inserted sequentially
         # But for safety, we might want to sort on retrieval
-        self.client.rpush(trace_span_key, json.dumps(span))
-        self.client.expire(trace_span_key, self.ttl)
+        pipe.rpush(trace_span_key, json.dumps(span))
+        pipe.expire(trace_span_key, self.ttl)
         
         # Add to span index (sorted by time)
-        self.client.zadd('span_index', {span_id: time.time()})
-        self.client.expire('span_index', self.ttl)
+        pipe.zadd('span_index', {span_id: time.time()})
+        pipe.expire('span_index', self.ttl)
+        
+        # Execute all commands
+        pipe.execute()
 
     def get_recent_traces(self, limit=100):
         """Get recent trace IDs"""
@@ -231,20 +239,26 @@ class Storage:
         # Ensure timestamp is in log
         log['timestamp'] = timestamp
         
+        # Use pipeline for batch writes
+        pipe = self.client.pipeline()
+        
         # Store log content
         log_key = f"log:{log_id}"
-        self.client.setex(log_key, self.ttl, json.dumps(log))
+        pipe.setex(log_key, self.ttl, json.dumps(log))
         
         # Index by time
-        self.client.zadd('log_index', {log_id: timestamp})
-        self.client.expire('log_index', self.ttl)
+        pipe.zadd('log_index', {log_id: timestamp})
+        pipe.expire('log_index', self.ttl)
         
         # Index by trace_id if present
         trace_id = log.get('trace_id') or log.get('traceId')
         if trace_id:
             trace_log_key = f"trace:{trace_id}:logs"
-            self.client.rpush(trace_log_key, log_id)
-            self.client.expire(trace_log_key, self.ttl)
+            pipe.rpush(trace_log_key, log_id)
+            pipe.expire(trace_log_key, self.ttl)
+            
+        # Execute all commands
+        pipe.execute()
 
     def get_logs(self, trace_id=None, limit=100):
         """Get logs, optionally filtered by trace_id"""
@@ -281,10 +295,12 @@ class Storage:
         if not is_existing and current_count >= self.max_cardinality:
             # Drop this metric to prevent cardinality explosion
             # Log to a separate key for monitoring
-            self.client.incr('metric_dropped_count')
-            self.client.expire('metric_dropped_count', self.ttl)
-            self.client.sadd('metric_dropped_names', name)
-            self.client.expire('metric_dropped_names', 3600)  # Keep for 1 hour for debugging
+            pipe = self.client.pipeline()
+            pipe.incr('metric_dropped_count')
+            pipe.expire('metric_dropped_count', self.ttl)
+            pipe.sadd('metric_dropped_names', name)
+            pipe.expire('metric_dropped_names', 3600)  # Keep for 1 hour for debugging
+            pipe.execute()
             return
             
         # Store in time-series sorted set
@@ -294,12 +310,15 @@ class Storage:
         # In a real system, this would be more optimized
         metric_data = json.dumps(metric)
         
-        self.client.zadd(metric_key, {metric_data: timestamp})
-        self.client.expire(metric_key, self.ttl)
+        pipe = self.client.pipeline()
+        pipe.zadd(metric_key, {metric_data: timestamp})
+        pipe.expire(metric_key, self.ttl)
         
         # Add to metric names index
-        self.client.sadd('metric_names', name)
-        self.client.expire('metric_names', self.ttl)
+        pipe.sadd('metric_names', name)
+        pipe.expire('metric_names', self.ttl)
+        
+        pipe.execute()
 
     def get_metric_names(self, limit=None):
         """Get metric names, optionally limited and sorted"""
@@ -331,6 +350,12 @@ class Storage:
 
     def get_service_graph(self, limit=50):
         """Build service dependency graph from recent traces"""
+        # Check cache first
+        cache_key = f"service_graph_cache:{limit}"
+        cached_graph = self.client.get(cache_key)
+        if cached_graph:
+            return json.loads(cached_graph)
+
         trace_ids = self.get_recent_traces(limit)
         
         nodes = set()
@@ -361,10 +386,15 @@ class Storage:
         graph_nodes = [{'id': name, 'label': name} for name in nodes]
         graph_edges = [{'source': s, 'target': t, 'value': c} for (s, t), c in edges.items()]
         
-        return {
+        result = {
             'nodes': graph_nodes,
             'edges': graph_edges
         }
+        
+        # Cache the result for 10 seconds
+        self.client.setex(cache_key, 10, json.dumps(result))
+        
+        return result
 
     # ============================================
     # Stats

@@ -37,3 +37,37 @@ export function downloadJson(data, filename) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
+export function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+let chartJsPromise = null;
+
+export function loadChartJs() {
+    if (window.Chart) {
+        return Promise.resolve(window.Chart);
+    }
+
+    if (chartJsPromise) {
+        return chartJsPromise;
+    }
+
+    chartJsPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = () => resolve(window.Chart);
+        script.onerror = () => reject(new Error('Failed to load Chart.js'));
+        document.head.appendChild(script);
+    });
+
+    return chartJsPromise;
+}
