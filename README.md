@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docker/static/tinyollytitle.png" alt="TinyOlly" width="500">
+  <img src="images/tinyollytitle.png" alt="TinyOlly" width="500">
   
   **An Observability Platform For Your Desktop Dev Environment**
 </div>
@@ -12,7 +12,34 @@ Think of TinyOlly as a local tool to livetail your metrics/traces/logs during de
 
 Included is a demo app with two Flask microservices using Otel auto-instrumentation for tracing and SDK for logs and metrics. 
 
-TinyOlly was built and tested on Docker Desktop and Minikube on Apple Silicon Mac.  
+TinyOlly was built and tested on Docker Desktop and Minikube on Apple Silicon Mac.
+
+## Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="images/traces.png" width="400"><br>
+        <em>Distributed traces with service correlation</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="images/tracewaterfall.png" width="400"><br>
+        <em>Trace waterfall visualization with span timing</em>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="images/logs.png" width="400"><br>
+        <em>Real-time logs with trace/span linking</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="images/metrics.png" width="400"><br>
+        <em>Metrics with type-specific visualizations</em>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ## Docker: Quick Start
 
