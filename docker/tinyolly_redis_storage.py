@@ -19,7 +19,16 @@ MAX_METRIC_CARDINALITY = int(os.getenv('MAX_METRIC_CARDINALITY', 1000))  # Preve
 class Storage:
     def __init__(self, host=REDIS_HOST, port=REDIS_PORT, ttl=TTL_SECONDS, max_cardinality=MAX_METRIC_CARDINALITY):
         # Use connection pool for better performance
-        self.pool = redis.ConnectionPool(host=host, port=port, decode_responses=True)
+        # Add retry logic for stability
+        self.pool = redis.ConnectionPool(
+            host=host, 
+            port=port, 
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            retry_on_timeout=True,
+            health_check_interval=30
+        )
         self.client = redis.Redis(connection_pool=self.pool)
         self.ttl = ttl
         self.max_cardinality = max_cardinality
@@ -37,45 +46,55 @@ class Storage:
 
     def store_span(self, span):
         """Store a span and index it"""
-        trace_id = span.get('traceId') or span.get('trace_id')
-        span_id = span.get('spanId') or span.get('span_id')
-        
-        if not trace_id or not span_id:
-            return
-        
-        # Ensure consistent format for storage
-        # We want to support both OTLP format (camelCase) and internal format
-        # This is a simplified normalization
-        
-        # Use pipeline for batch writes
-        pipe = self.client.pipeline()
-        
-        # Store individual span
-        span_key = f"span:{span_id}"
-        pipe.setex(span_key, self.ttl, json.dumps(span))
-        
-        # Add span to trace set (for existence check)
-        trace_key = f"trace:{trace_id}"
-        pipe.sadd(trace_key, span_id)
-        pipe.expire(trace_key, self.ttl)
-        
-        # Add to trace index (sorted by time)
-        pipe.zadd('trace_index', {trace_id: time.time()})
-        pipe.expire('trace_index', self.ttl)
-        
-        # Add to trace's list of spans (for retrieval)
-        trace_span_key = f"trace:{trace_id}:spans"
-        # We use rpush to append to the end, preserving order if inserted sequentially
-        # But for safety, we might want to sort on retrieval
-        pipe.rpush(trace_span_key, json.dumps(span))
-        pipe.expire(trace_span_key, self.ttl)
-        
-        # Add to span index (sorted by time)
-        pipe.zadd('span_index', {span_id: time.time()})
-        pipe.expire('span_index', self.ttl)
-        
-        # Execute all commands
-        pipe.execute()
+        try:
+            trace_id = span.get('traceId') or span.get('trace_id')
+            span_id = span.get('spanId') or span.get('span_id')
+            
+            if not trace_id or not span_id:
+                return
+            
+            # Duplicate Span Detection
+            # Check if span already exists in the trace set
+            trace_key = f"trace:{trace_id}"
+            if self.client.sismember(trace_key, span_id):
+                # Span already processed, skip to avoid duplicates
+                return
+
+            # Ensure consistent format for storage
+            # We want to support both OTLP format (camelCase) and internal format
+            # This is a simplified normalization
+            
+            # Use pipeline for batch writes
+            pipe = self.client.pipeline()
+            
+            # Store individual span
+            span_key = f"span:{span_id}"
+            pipe.setex(span_key, self.ttl, json.dumps(span))
+            
+            # Add span to trace set (for existence check)
+            pipe.sadd(trace_key, span_id)
+            pipe.expire(trace_key, self.ttl)
+            
+            # Add to trace index (sorted by time)
+            pipe.zadd('trace_index', {trace_id: time.time()})
+            pipe.expire('trace_index', self.ttl)
+            
+            # Add to trace's list of spans (for retrieval)
+            trace_span_key = f"trace:{trace_id}:spans"
+            # We use rpush to append to the end, preserving order if inserted sequentially
+            # But for safety, we might want to sort on retrieval
+            pipe.rpush(trace_span_key, json.dumps(span))
+            pipe.expire(trace_span_key, self.ttl)
+            
+            # Add to span index (sorted by time)
+            pipe.zadd('span_index', {span_id: time.time()})
+            pipe.expire('span_index', self.ttl)
+            
+            # Execute all commands
+            pipe.execute()
+        except redis.RedisError as e:
+            print(f"Redis error in store_span: {e}")
+            # Graceful degradation: just log error and continue, data might be lost but app stays up
 
     def get_recent_traces(self, limit=100):
         """Get recent trace IDs"""
@@ -229,52 +248,59 @@ class Storage:
 
     def store_log(self, log):
         """Store a log entry"""
-        # Generate ID if not present
-        if 'log_id' not in log:
-            log['log_id'] = str(uuid.uuid4())
+        try:
+            # Generate ID if not present
+            if 'log_id' not in log:
+                log['log_id'] = str(uuid.uuid4())
+                
+            log_id = log['log_id']
+            timestamp = log.get('timestamp', time.time())
             
-        log_id = log['log_id']
-        timestamp = log.get('timestamp', time.time())
-        
-        # Ensure timestamp is in log
-        log['timestamp'] = timestamp
-        
-        # Use pipeline for batch writes
-        pipe = self.client.pipeline()
-        
-        # Store log content
-        log_key = f"log:{log_id}"
-        pipe.setex(log_key, self.ttl, json.dumps(log))
-        
-        # Index by time
-        pipe.zadd('log_index', {log_id: timestamp})
-        pipe.expire('log_index', self.ttl)
-        
-        # Index by trace_id if present
-        trace_id = log.get('trace_id') or log.get('traceId')
-        if trace_id:
-            trace_log_key = f"trace:{trace_id}:logs"
-            pipe.rpush(trace_log_key, log_id)
-            pipe.expire(trace_log_key, self.ttl)
+            # Ensure timestamp is in log
+            log['timestamp'] = timestamp
             
-        # Execute all commands
-        pipe.execute()
+            # Use pipeline for batch writes
+            pipe = self.client.pipeline()
+            
+            # Store log content
+            log_key = f"log:{log_id}"
+            pipe.setex(log_key, self.ttl, json.dumps(log))
+            
+            # Index by time
+            pipe.zadd('log_index', {log_id: timestamp})
+            pipe.expire('log_index', self.ttl)
+            
+            # Index by trace_id if present
+            trace_id = log.get('trace_id') or log.get('traceId')
+            if trace_id:
+                trace_log_key = f"trace:{trace_id}:logs"
+                pipe.rpush(trace_log_key, log_id)
+                pipe.expire(trace_log_key, self.ttl)
+                
+            # Execute all commands
+            pipe.execute()
+        except redis.RedisError as e:
+            print(f"Redis error in store_log: {e}")
 
     def get_logs(self, trace_id=None, limit=100):
         """Get logs, optionally filtered by trace_id"""
-        if trace_id:
-            trace_log_key = f"trace:{trace_id}:logs"
-            log_ids = self.client.lrange(trace_log_key, 0, limit - 1)
-        else:
-            log_ids = self.client.zrevrange('log_index', 0, limit - 1)
+        try:
+            if trace_id:
+                trace_log_key = f"trace:{trace_id}:logs"
+                log_ids = self.client.lrange(trace_log_key, 0, limit - 1)
+            else:
+                log_ids = self.client.zrevrange('log_index', 0, limit - 1)
+                
+            logs = []
+            for log_id in log_ids:
+                log_data = self.client.get(f"log:{log_id}")
+                if log_data:
+                    logs.append(json.loads(log_data))
             
-        logs = []
-        for log_id in log_ids:
-            log_data = self.client.get(f"log:{log_id}")
-            if log_data:
-                logs.append(json.loads(log_data))
-        
-        return logs
+            return logs
+        except redis.RedisError as e:
+            print(f"Redis error in get_logs: {e}")
+            return []
 
     # ============================================
     # Metric Storage
@@ -282,43 +308,46 @@ class Storage:
 
     def store_metric(self, metric):
         """Store a metric with cardinality protection"""
-        name = metric.get('name')
-        timestamp = metric.get('timestamp', time.time())
-        
-        if not name:
-            return
-        
-        # Check cardinality limit before adding new metric
-        current_count = self.client.scard('metric_names')
-        is_existing = self.client.sismember('metric_names', name)
-        
-        if not is_existing and current_count >= self.max_cardinality:
-            # Drop this metric to prevent cardinality explosion
-            # Log to a separate key for monitoring
-            pipe = self.client.pipeline()
-            pipe.incr('metric_dropped_count')
-            pipe.expire('metric_dropped_count', self.ttl)
-            pipe.sadd('metric_dropped_names', name)
-            pipe.expire('metric_dropped_names', 3600)  # Keep for 1 hour for debugging
-            pipe.execute()
-            return
+        try:
+            name = metric.get('name')
+            timestamp = metric.get('timestamp', time.time())
             
-        # Store in time-series sorted set
-        metric_key = f"metric:{name}"
-        
-        # We store the whole metric object as the member
-        # In a real system, this would be more optimized
-        metric_data = json.dumps(metric)
-        
-        pipe = self.client.pipeline()
-        pipe.zadd(metric_key, {metric_data: timestamp})
-        pipe.expire(metric_key, self.ttl)
-        
-        # Add to metric names index
-        pipe.sadd('metric_names', name)
-        pipe.expire('metric_names', self.ttl)
-        
-        pipe.execute()
+            if not name:
+                return
+            
+            # Check cardinality limit before adding new metric
+            current_count = self.client.scard('metric_names')
+            is_existing = self.client.sismember('metric_names', name)
+            
+            if not is_existing and current_count >= self.max_cardinality:
+                # Drop this metric to prevent cardinality explosion
+                # Log to a separate key for monitoring
+                pipe = self.client.pipeline()
+                pipe.incr('metric_dropped_count')
+                pipe.expire('metric_dropped_count', self.ttl)
+                pipe.sadd('metric_dropped_names', name)
+                pipe.expire('metric_dropped_names', 3600)  # Keep for 1 hour for debugging
+                pipe.execute()
+                return
+                
+            # Store in time-series sorted set
+            metric_key = f"metric:{name}"
+            
+            # We store the whole metric object as the member
+            # In a real system, this would be more optimized
+            metric_data = json.dumps(metric)
+            
+            pipe = self.client.pipeline()
+            pipe.zadd(metric_key, {metric_data: timestamp})
+            pipe.expire(metric_key, self.ttl)
+            
+            # Add to metric names index
+            pipe.sadd('metric_names', name)
+            pipe.expire('metric_names', self.ttl)
+            
+            pipe.execute()
+        except redis.RedisError as e:
+            print(f"Redis error in store_metric: {e}")
 
     def get_metric_names(self, limit=None):
         """Get metric names, optionally limited and sorted"""

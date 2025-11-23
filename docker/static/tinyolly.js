@@ -31,28 +31,38 @@ window.filterMetrics = filterMetrics;
 window.clearLogFilter = clearLogFilter;
 window.filterLogs = filterLogs;
 
+// Global error handler
+window.onerror = function (message, source, lineno, colno, error) {
+    console.error('Global error caught:', message, error);
+    return false;
+};
+
 // Initialize after DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('TinyOlly initializing...');
-    initTheme();
-    initTabs();
-    loadStats();
+    try {
+        console.log('TinyOlly initializing...');
+        initTheme();
+        initTabs();
+        loadStats();
 
-    // Attach log search event listener with debounce
-    const logSearch = document.getElementById('log-search');
-    if (logSearch) {
-        logSearch.addEventListener('keyup', debounce(filterLogs, 300));
-        console.log('✓ Log search listener attached (debounced)');
-    }
+        // Attach log search event listener with debounce
+        const logSearch = document.getElementById('log-search');
+        if (logSearch) {
+            logSearch.addEventListener('keyup', debounce(filterLogs, 300));
+            console.log('✓ Log search listener attached (debounced)');
+        }
 
-    // Attach metric search event listener with debounce
-    const metricSearch = document.getElementById('metric-search');
-    if (metricSearch) {
-        metricSearch.addEventListener('keyup', debounce(filterMetrics, 300));
-        console.log('✓ Metric search listener attached (debounced)');
-    }
+        // Attach metric search event listener with debounce
+        const metricSearch = document.getElementById('metric-search');
+        if (metricSearch) {
+            metricSearch.addEventListener('keyup', debounce(filterMetrics, 300));
+            console.log('✓ Metric search listener attached (debounced)');
+        }
 
-    if (localStorage.getItem('tinyolly-auto-refresh') !== 'false') {
-        startAutoRefresh();
+        if (localStorage.getItem('tinyolly-auto-refresh') !== 'false') {
+            startAutoRefresh();
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
     }
 });

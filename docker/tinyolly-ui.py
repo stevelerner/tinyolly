@@ -26,7 +26,16 @@ storage = Storage()
 @app.route('/v1/traces', methods=['POST'])
 def ingest_traces():
     """Accept traces in OTLP JSON format or simplified format"""
-    data = request.json
+    # Validate payload size (limit to 5MB)
+    if request.content_length and request.content_length > 5 * 1024 * 1024:
+        return jsonify({'error': 'Payload too large'}), 413
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
+    except Exception:
+        return jsonify({'error': 'Invalid JSON'}), 400
     
     # Handle both OTLP format and simplified format
     if 'resourceSpans' in data:
@@ -48,12 +57,24 @@ def ingest_traces():
 @app.route('/v1/logs', methods=['POST'])
 def ingest_logs():
     """Accept logs in JSON format"""
-    data = request.json
+    # Validate payload size (limit to 5MB)
+    if request.content_length and request.content_length > 5 * 1024 * 1024:
+        return jsonify({'error': 'Payload too large'}), 413
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
+    except Exception:
+        return jsonify({'error': 'Invalid JSON'}), 400
     
     # Handle array or single log
     logs = data if isinstance(data, list) else [data]
     
     for log in logs:
+        # Basic validation
+        if not isinstance(log, dict):
+            continue
         storage.store_log(log)
     
     return jsonify({'status': 'ok'}), 200
@@ -61,12 +82,24 @@ def ingest_logs():
 @app.route('/v1/metrics', methods=['POST'])
 def ingest_metrics():
     """Accept metrics in JSON format"""
-    data = request.json
+    # Validate payload size (limit to 5MB)
+    if request.content_length and request.content_length > 5 * 1024 * 1024:
+        return jsonify({'error': 'Payload too large'}), 413
+
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
+    except Exception:
+        return jsonify({'error': 'Invalid JSON'}), 400
     
     # Handle array or single metric
     metrics = data if isinstance(data, list) else [data]
     
     for metric in metrics:
+        # Basic validation
+        if not isinstance(metric, dict) or 'name' not in metric:
+            continue
         storage.store_metric(metric)
     
     return jsonify({'status': 'ok'}), 200
