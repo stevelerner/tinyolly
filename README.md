@@ -1,4 +1,10 @@
-# TinyOlly - An Observability Platform For Your Desktop Dev Environment
+<div align="center">
+  <img src="docker/static/tinyollytitle.png" alt="TinyOlly" width="500">
+  
+  **An Observability Platform For Your Desktop Dev Environment**
+</div>
+
+---
 
 A **lightweight observability system built from scratch** to visualize and correlate logs, metrics, and traces. No 3rd party Observability tools are used - just Flask, Redis, and Chart.js.  
 
@@ -77,7 +83,7 @@ After deploying TinyOlly core (step 1 above), instrument your application to sen
 - **gRPC**: `http://otel-collector:4317`
 - **HTTP**: `http://otel-collector:4318`
 
-Your app can use manual or auto-instrumentation for traces. Use the OpenTelemetry SDK for logs and metrics. The collector will forward everything to TinyOlly's receiver, which stores it in Redis and displays it in the UI.
+ The Otel Collector will forward everything to TinyOlly's OTLP receiver, which process telemetry and stores it in Redis for the backend and UI to access.
 
 ## TinyOlly on Kubernetes (Minikube): Quick Start
 
