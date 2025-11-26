@@ -1,0 +1,22 @@
+# TinyOlly OTLP Receiver Dockerfile (gRPC)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application
+COPY tinyolly-otlp-receiver.py .
+COPY tinyolly_redis_storage.py .
+
+# Expose gRPC port
+EXPOSE 4317
+
+# Set Python to unbuffered mode for immediate log output
+ENV PYTHONUNBUFFERED=1
+
+# Run the application
+CMD ["python", "-u", "tinyolly-otlp-receiver.py"]
+
