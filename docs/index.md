@@ -5,14 +5,15 @@
 
 ---
 
-## What is TinyOlly?
+## Introducing TinyOlly
 
 TinyOlly is located here: [https://github.com/tinyolly/tinyolly](https://github.com/tinyolly/tinyolly)  
 ```bash
 git clone https://github.com/tinyolly/tinyolly
 ```
+Why send telemetry to a cloud observabilty platform while coding? Why not have one on your desktop?  
 
-A **lightweight OpenTelemetry-native observability platform** built from scratch to visualize and correlate logs, metrics, and traces. No 3rd party observability tools - just Python (FastAPI), Redis, OpenAPI, and JavaScript.
+TinyOlly is a **lightweight OpenTelemetry-native observability platform** built from scratch to visualize and correlate logs, metrics, and traces. No 3rd party observability tools - just Python (FastAPI), Redis, OpenAPI, and JavaScript.
 
 - Think of TinyOlly as a development tool to observe and perfect your app's telemetry while in dev 
 - Export metrics, logs, and traces to the Otel collector on Docker or K8S and TinyOlly will visualize and correlate them 
