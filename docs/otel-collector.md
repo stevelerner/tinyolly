@@ -1,0 +1,48 @@
+# OpenTelemetry Collector
+
+TinyOlly uses the [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) as the telemetry ingestion and shipping layer. The collector receives telemetry from your applications and forwards it to TinyOlly's OTLP receiver.
+
+## Configuration
+
+TinyOlly includes a sample collector configuration that you can customize for your needs. The configuration files are located at:
+
+- **Docker**: `docker/otel-collector-config.yaml`
+- **Kubernetes**: `k8s/otel-collector-config.yaml`
+
+## Default Configuration
+
+The default configuration includes:
+
+- **OTLP Receivers**: Accepts telemetry on ports 4317 (gRPC) and 4318 (HTTP)
+- **Span Metrics Connector**: Automatically generates RED metrics from traces
+- **Batch Processor**: Batches telemetry for efficient processing
+- **OTLP Exporter**: Forwards all telemetry to TinyOlly's OTLP receiver
+
+## Customization Examples
+
+You can extend the collector configuration to add additional capabilities. The collector uses the `otel/opentelemetry-collector-contrib` image which includes:
+
+- **Receivers**: OTLP, Prometheus, Jaeger, Zipkin, and many more
+- **Processors**: Batch, Memory Limiter, Resource Detection, Tail Sampling, Filtering
+- **Connectors**: Span Metrics, Service Graph
+- **Exporters**: OTLP, Prometheus, Logging, and many more
+
+For a complete list of available components, see the [OpenTelemetry Collector Contrib documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib).
+
+## Applying Changes
+
+### Docker
+
+After modifying `docker/otel-collector-config.yaml` rebuild/restart using:  
+```bash
+cd docker
+./01-start-core.sh
+```
+
+### Kubernetes
+
+After modifying `k8s/otel-collector-config.yaml`: rebuild/restart using:  
+```bash
+kubectl apply -f k8s/otel-collector-config.yaml
+kubectl rollout restart deployment/otel-collector
+```

@@ -57,6 +57,7 @@ nav:
   - About TinyOlly: index.md
   - Run on Docker: docker.md
   - Run on Kubernetes: kubernetes.md
+  - OpenTelemetry Collector Config: otel-collector.md
   - REST API: api.md
   - Architecture: technical.md
   - Cardinality Protection: CARDINALITY-PROTECTION.md
