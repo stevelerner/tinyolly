@@ -1,0 +1,72 @@
+site_name: TinyOlly Documentation
+site_description: BYOL (Bring Your Own Laptop) Observability Platform for OpenTelemetry
+site_author: TinyOlly
+repo_url: https://github.com/tinyolly/tinyolly
+repo_name: tinyolly/tinyolly
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.index
+    - navigation.sections
+    - navigation.expand
+    - navigation.instant
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.tabs
+    - content.code.annotate
+  logo: images/logo.png
+  favicon: images/contact-email.svg
+
+extra_css:
+  - assets/css/custom.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - About TinyOlly: index.md
+  - Run on Docker: docker.md
+  - Run on Kubernetes: kubernetes.md
+  - REST API: api.md
+  - Architecture: technical.md
+  - Cardinality Protection: CARDINALITY-PROTECTION.md
+  - Licensing: licensing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tinyolly/tinyolly
+    - icon: fontawesome/brands/github
+      link: https://github.com/tinyolly/tinyolly/issues
+      name: Issues
+
