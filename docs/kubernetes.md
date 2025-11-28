@@ -1,6 +1,6 @@
 # Kubernetes Deployment
 
-All examples are launched from the repo - clone it first:  
+All examples are launched from the repo - clone it first or download the current GitHub release archive:  
 ```bash
 git clone https://github.com/tinyolly/tinyolly
 ```  
