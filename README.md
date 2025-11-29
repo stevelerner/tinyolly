@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/tinyollytitle.png" alt="TinyOlly" width="500">
+  <img src="docs/images/tinyollytitle.png" alt="TinyOlly" width="500">
   
   **BYOL (Bring Your Own Laptop) Observability Platform for OpenTelemetry**
 </div>
@@ -31,21 +31,21 @@ TinyOlly was built and tested Docker Desktop and Minikube Kubernetes on Apple Si
   <table>
     <tr>
       <td align="center" width="50%">
-        <img src="images/traces.png" width="400"><br>
+        <img src="docs/images/traces.png" width="400"><br>
         <em>Distributed traces with service correlation</em>
       </td>
       <td align="center" width="50%">
-        <img src="images/tracewaterfall.png" width="400"><br>
+        <img src="docs/images/tracewaterfall.png" width="400"><br>
         <em>Trace waterfall visualization with span timing</em>
       </td>
     </tr>
     <tr>
       <td align="center" width="50%">
-        <img src="images/logs.png" width="400"><br>
+        <img src="docs/images/logs.png" width="400"><br>
         <em>Real-time logs with trace/span linking</em>
       </td>
       <td align="center" width="50%">
-        <img src="images/metrics.png" width="400"><br>
+        <img src="docs/images/metrics.png" width="400"><br>
         <em>Metrics with type-specific visualizations</em>
       </td>
     </tr>
@@ -460,7 +460,7 @@ Organizations deploying TinyOlly in a broader or more intensive capacity are req
 
 For commercial licensing inquiries, contact:  
 <div align="center">
-  <img src="images/contact-email.svg" alt="Contact Email">
+  <img src="docs/images/contact-email.svg" alt="Contact Email">
 </div>
 
 ### Rationale
