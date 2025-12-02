@@ -159,8 +159,7 @@ def serve():
     metrics_service_pb2_grpc.add_MetricsServiceServicer_to_server(MetricsService(), server)
     
     # Listen on port 4317 (standard OTLP gRPC port)
-    # Use 0.0.0.0 to accept both IPv4 and IPv6 connections
-    server.add_insecure_port('0.0.0.0:4317')
+    server.add_insecure_port('[::]:4317')
     
     print("TinyOlly OTLP Receiver (gRPC) starting on port 4317...")
     
