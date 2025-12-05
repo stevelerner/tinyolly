@@ -10,8 +10,10 @@ services:
 
   tinyolly-otlp-receiver:
     build:
-      context: ../docker/apps/tinyolly-otlp-receiver
-      dockerfile: ../../dockerfiles/Dockerfile.tinyolly-otlp-receiver
+      context: ../docker/apps
+      dockerfile: ../dockerfiles/Dockerfile.tinyolly-otlp-receiver
+      args:
+        - APP_DIR=tinyolly-otlp-receiver
     container_name: tinyolly-otlp-receiver
     depends_on:
       - tinyolly-redis
@@ -30,8 +32,10 @@ services:
 
   tinyolly-ui:
     build:
-      context: ../docker/apps/tinyolly-ui
-      dockerfile: ../../dockerfiles/Dockerfile.tinyolly-ui
+      context: ../docker/apps
+      dockerfile: ../dockerfiles/Dockerfile.tinyolly-ui
+      args:
+        - APP_DIR=tinyolly-ui
     container_name: tinyolly-ui
     ports:
       - "5005:5002"  # Exposed on 5005 to avoid conflict if running alongside full demo

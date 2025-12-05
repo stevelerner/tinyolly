@@ -8,8 +8,10 @@ services:
 
   tinyolly-otlp-receiver:
     build:
-      context: ./apps/tinyolly-otlp-receiver
-      dockerfile: ../../dockerfiles/Dockerfile.tinyolly-otlp-receiver
+      context: ./apps
+      dockerfile: ../dockerfiles/Dockerfile.tinyolly-otlp-receiver
+      args:
+        - APP_DIR=tinyolly-otlp-receiver
     container_name: tinyolly-otlp-receiver
     ports:
       - "4343:4343"
@@ -32,8 +34,10 @@ services:
 
   tinyolly-ui:
     build:
-      context: ./apps/tinyolly-ui
-      dockerfile: ../../dockerfiles/Dockerfile.tinyolly-ui
+      context: ./apps
+      dockerfile: ../dockerfiles/Dockerfile.tinyolly-ui
+      args:
+        - APP_DIR=tinyolly-ui
     image: tinyolly-ui:latest
     container_name: tinyolly-ui
     ports:

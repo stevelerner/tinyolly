@@ -477,3 +477,32 @@ export function closeAllExpandedItems(config) {
         });
     }
 }
+
+/** Renders limit/pagination note */
+export function renderLimitNote(current, total, customMessage) {
+    if (customMessage) {
+        return `<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">${customMessage}</div>`;
+    }
+    if (current === total) {
+        return '';
+    }
+    return `<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">Showing ${current} of ${total} items</div>`;
+}
+
+/** Preserves and restores search filter value during re-renders */
+export function preserveSearchFilter(inputId, filterFn) {
+    const searchInput = document.getElementById(inputId);
+    const savedValue = searchInput ? searchInput.value : '';
+
+    return {
+        savedValue,
+        restore() {
+            if (savedValue && searchInput) {
+                searchInput.value = savedValue;
+                if (filterFn) {
+                    setTimeout(() => filterFn(), 10);
+                }
+            }
+        }
+    };
+}

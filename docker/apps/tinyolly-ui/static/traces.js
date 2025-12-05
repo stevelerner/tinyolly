@@ -1,7 +1,7 @@
 /**
  * Traces Module - Handles trace list and waterfall visualization
  */
-import { formatTime, formatTraceId, formatDuration, copyToClipboard, downloadJson, getStatusCodeColor, formatRoute, renderJsonDetailView, renderActionButton, renderEmptyState, filterTableRows, getAttributeValue, navigateToTabWithFilter, copyJsonWithFeedback, downloadTelemetryJson, smoothScrollTo, extractServiceName, closeAllExpandedItems } from './utils.js';
+import { formatTime, formatTraceId, formatDuration, copyToClipboard, downloadJson, getStatusCodeColor, formatRoute, renderJsonDetailView, renderActionButton, renderEmptyState, filterTableRows, getAttributeValue, navigateToTabWithFilter, copyJsonWithFeedback, downloadTelemetryJson, smoothScrollTo, extractServiceName, closeAllExpandedItems, renderTableHeader, renderLimitNote } from './utils.js';
 import { fetchTraceDetail, loadTraces } from './api.js';
 
 let currentTraceId = null;
@@ -15,20 +15,18 @@ export function renderTraces(traces) {
         return;
     }
 
-    const limitNote = traces.length >= 50 ? '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">Showing last 50 traces (older data available in Redis).</div>' : '';
+    const limitNote = traces.length >= 50 ? renderLimitNote(50, traces.length, 'Showing last 50 traces (older data available in Redis).') : '';
 
-    const headerRow = `
-        <div class="trace-header-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 2px solid var(--border-color); background: var(--bg-secondary); font-weight: bold; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-            <div style="flex: 0 0 100px;">Time</div>
-            <div style="flex: 0 0 120px;">ServiceName</div>
-            <div style="flex: 0 0 260px;">traceId</div>
-            <div style="flex: 0 0 60px; text-align: right;">Spans</div>
-            <div style="flex: 0 0 80px; text-align: right;">Duration ms</div>
-            <div style="flex: 0 0 70px;">Method</div>
-            <div style="flex: 1;">Route / URL</div>
-            <div style="flex: 0 0 60px; text-align: right;">Status</div>
-        </div>
-    `;
+    const headerRow = renderTableHeader([
+        { label: 'Time', flex: 'flex: 0 0 100px' },
+        { label: 'ServiceName', flex: 'flex: 0 0 120px' },
+        { label: 'traceId', flex: 'flex: 0 0 260px' },
+        { label: 'Spans', flex: 'flex: 0 0 60px', align: 'right' },
+        { label: 'Duration ms', flex: 'flex: 0 0 80px', align: 'right' },
+        { label: 'Method', flex: 'flex: 0 0 70px' },
+        { label: 'Route / URL', flex: 'flex: 1' },
+        { label: 'Status', flex: 'flex: 0 0 60px', align: 'right' }
+    ]);
 
     container.innerHTML = limitNote + headerRow + traces.map(trace => {
         const displayTraceId = formatTraceId(trace.trace_id);

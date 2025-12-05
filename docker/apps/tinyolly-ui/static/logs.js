@@ -1,7 +1,7 @@
 /**
  * Logs Module - Handles log list, filtering, and detail views
  */
-import { formatTraceId, copyToClipboard, downloadJson, formatTimestamp, renderJsonDetailView, getSeverityColor, renderActionButton, renderEmptyState, filterTableRows, copyJsonWithFeedback, downloadTelemetryJson, closeAllExpandedItems } from './utils.js';
+import { formatTraceId, copyToClipboard, downloadJson, formatTimestamp, renderJsonDetailView, getSeverityColor, renderActionButton, renderEmptyState, filterTableRows, copyJsonWithFeedback, downloadTelemetryJson, closeAllExpandedItems, renderTableHeader, renderLimitNote, preserveSearchFilter } from './utils.js';
 
 const MAX_LOGS_IN_MEMORY = 1000; // Prevent unbounded memory growth
 let currentLogs = [];
@@ -36,20 +36,12 @@ export function renderLogs(logs, containerId = 'logs-container') {
     }
 
     // Preserve current search filter
-    const searchInput = document.getElementById('log-search');
-    const currentFilter = searchInput ? searchInput.value : '';
+    const searchFilter = preserveSearchFilter('log-search', filterLogs);
 
     renderLogList(container, logs.slice(0, displayedLogsCount), logs.length);
 
-    // Restore search input value (in case it was cleared during render)
-    if (currentFilter && searchInput) {
-        searchInput.value = currentFilter;
-    }
-
-    // Re-apply search filter if one was active
-    if (currentFilter) {
-        setTimeout(() => filterLogs(), 10);
-    }
+    // Restore search filter
+    searchFilter.restore();
 
     // Add click handlers using event delegation
     // Remove existing listener to avoid duplicates if renderLogs is called multiple times
@@ -61,19 +53,17 @@ export function renderLogs(logs, containerId = 'logs-container') {
 }
 
 function renderLogList(container, logsToShow, totalLogs) {
-    const limitNote = `<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">Showing ${logsToShow.length} of ${totalLogs} logs</div>`;
+    const limitNote = renderLimitNote(logsToShow.length, totalLogs, `Showing ${logsToShow.length} of ${totalLogs} logs`);
 
     // Build table with headers
-    const headerRow = `
-        <div class="log-header-row" style="display: flex; align-items: center; gap: 15px; padding: 8px 12px; border-bottom: 2px solid var(--border-color); background: var(--bg-secondary); font-weight: bold; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-            <div style="flex: 0 0 100px;">Time</div>
-            <div style="flex: 0 0 120px;">ServiceName</div>
-            <div style="flex: 0 0 60px;">Severity</div>
-            <div style="flex: 0 0 180px;">traceId</div>
-            <div style="flex: 0 0 140px;">spanId</div>
-            <div style="flex: 1; min-width: 200px;">Message</div>
-        </div>
-    `;
+    const headerRow = renderTableHeader([
+        { label: 'Time', flex: 'flex: 0 0 100px' },
+        { label: 'ServiceName', flex: 'flex: 0 0 120px' },
+        { label: 'Severity', flex: 'flex: 0 0 60px' },
+        { label: 'traceId', flex: 'flex: 0 0 180px' },
+        { label: 'spanId', flex: 'flex: 0 0 140px' },
+        { label: 'Message', flex: 'flex: 1; min-width: 200px' }
+    ]);
 
     const logsHtml = logsToShow.map((log, index) => {
         const timestamp = formatTimestamp(log.timestamp);

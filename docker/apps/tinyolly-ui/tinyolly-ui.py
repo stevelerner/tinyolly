@@ -18,7 +18,7 @@ import time
 import logging
 import sys
 from typing import Optional, Dict, Any, List, Literal, Set
-from tinyolly_redis_storage import Storage
+from tinyolly_common import Storage
 import uvloop
 import asyncio
 
