@@ -5,16 +5,17 @@ and provides a web UI for visualization and correlation.
 Optimized with ORJSON, uvloop, and batch operations.
 """
 
-from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import JSONResponse, HTMLResponse, ORJSONResponse
+from fastapi import FastAPI, Request, HTTPException, Query, status
+from fastapi.responses import JSONResponse, HTMLResponse, ORJSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from pydantic import BaseModel, Field
 import json
 import os
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from tinyolly_redis_storage import Storage
 import uvloop
 import asyncio
@@ -22,14 +23,269 @@ import asyncio
 # Install uvloop policy for faster event loop
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
+# ============================================
+# Pydantic Models for OpenAPI Schema
+# ============================================
+
+class ErrorResponse(BaseModel):
+    """Standard error response"""
+    detail: str = Field(..., description="Error message describing what went wrong")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "detail": "Trace not found"
+            }
+        }
+
+class HealthResponse(BaseModel):
+    """Health check response"""
+    status: Literal["healthy", "unhealthy"]
+    redis: Literal["connected", "disconnected"]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "healthy",
+                "redis": "connected"
+            }
+        }
+
+class IngestResponse(BaseModel):
+    """Response for ingestion endpoints"""
+    status: Literal["ok"]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "ok"
+            }
+        }
+
+class TraceSpan(BaseModel):
+    """Individual span in a trace"""
+    span_id: Optional[str] = Field(None, description="Unique span identifier")
+    trace_id: Optional[str] = Field(None, description="Trace ID this span belongs to")
+    parent_span_id: Optional[str] = Field(None, description="Parent span ID for hierarchy")
+    name: Optional[str] = Field(None, description="Span operation name")
+    kind: Optional[int] = Field(None, description="Span kind (internal, server, client, etc.)")
+    startTimeUnixNano: Optional[int] = Field(None, description="Start time in nanoseconds")
+    endTimeUnixNano: Optional[int] = Field(None, description="End time in nanoseconds")
+    attributes: Optional[Dict[str, Any]] = Field(None, description="Span attributes")
+    status: Optional[Dict[str, Any]] = Field(None, description="Span status")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "span_id": "abc123",
+                "trace_id": "trace-xyz",
+                "name": "GET /api/users",
+                "kind": 2,
+                "startTimeUnixNano": 1638360000000000000,
+                "endTimeUnixNano": 1638360001000000000,
+                "attributes": {"http.method": "GET", "http.status_code": 200},
+                "status": {"code": 0}
+            }
+        }
+
+class TraceSummary(BaseModel):
+    """Trace summary for list view"""
+    trace_id: str = Field(..., description="Unique trace identifier")
+    root_service: Optional[str] = Field(None, description="Root service name")
+    root_operation: Optional[str] = Field(None, description="Root operation name")
+    duration: Optional[float] = Field(None, description="Total trace duration in milliseconds")
+    span_count: Optional[int] = Field(None, description="Number of spans in trace")
+    start_time: Optional[float] = Field(None, description="Trace start time (Unix timestamp)")
+    has_errors: Optional[bool] = Field(None, description="Whether trace contains errors")
+
+class TraceDetail(BaseModel):
+    """Complete trace with all spans"""
+    trace_id: str = Field(..., description="Unique trace identifier")
+    spans: List[Dict[str, Any]] = Field(..., description="All spans in the trace")
+    span_count: int = Field(..., description="Total number of spans")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "trace_id": "trace-xyz",
+                "spans": [{"span_id": "abc123", "name": "GET /api/users"}],
+                "span_count": 1
+            }
+        }
+
+class SpanDetail(BaseModel):
+    """Detailed span information"""
+    span_id: str
+    trace_id: str
+    service_name: Optional[str] = None
+    operation: Optional[str] = None
+    duration: Optional[float] = None
+    attributes: Optional[Dict[str, Any]] = None
+
+class LogEntry(BaseModel):
+    """Log entry"""
+    log_id: Optional[str] = Field(None, description="Unique log identifier")
+    timestamp: Optional[float] = Field(None, description="Log timestamp (Unix)")
+    trace_id: Optional[str] = Field(None, description="Associated trace ID for correlation")
+    span_id: Optional[str] = Field(None, description="Associated span ID for correlation")
+    severity: Optional[str] = Field(None, description="Log severity level")
+    body: Optional[str] = Field(None, description="Log message body")
+    attributes: Optional[Dict[str, Any]] = Field(None, description="Additional log attributes")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "log_id": "log-123",
+                "timestamp": 1638360000.0,
+                "trace_id": "trace-xyz",
+                "severity": "INFO",
+                "body": "User request processed successfully",
+                "attributes": {"user_id": "user-456"}
+            }
+        }
+
+class MetricMetadata(BaseModel):
+    """Metric metadata"""
+    name: str = Field(..., description="Metric name")
+    type: str = Field(..., description="Metric type (gauge, counter, histogram, etc.)")
+    unit: str = Field(default="", description="Metric unit")
+    description: str = Field(default="", description="Metric description")
+    resource_count: int = Field(..., description="Number of unique resource combinations")
+    attribute_combinations: int = Field(..., description="Number of unique attribute combinations")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "http.server.duration",
+                "type": "histogram",
+                "unit": "ms",
+                "description": "HTTP request duration",
+                "resource_count": 3,
+                "attribute_combinations": 10
+            }
+        }
+
+class MetricTimeSeries(BaseModel):
+    """Time series data for a metric"""
+    resources: Dict[str, Any] = Field(..., description="Resource attributes")
+    attributes: Dict[str, Any] = Field(..., description="Metric labels/attributes")
+    data_points: List[Dict[str, Any]] = Field(..., description="Time series data points")
+
+class MetricDetail(BaseModel):
+    """Detailed metric information with time series"""
+    name: str = Field(..., description="Metric name")
+    type: str = Field(..., description="Metric type")
+    unit: str = Field(default="", description="Metric unit")
+    description: str = Field(default="", description="Metric description")
+    series: List[Dict[str, Any]] = Field(..., description="Time series data")
+
+class MetricQueryResult(BaseModel):
+    """Result of metric query with filters"""
+    name: str
+    type: str
+    unit: str
+    description: str
+    series: List[Dict[str, Any]]
+    filters: Dict[str, Dict[str, Any]] = Field(..., description="Applied filters")
+
+class ServiceNode(BaseModel):
+    """Service node in service map"""
+    name: str = Field(..., description="Service name")
+    request_count: int = Field(..., description="Total requests")
+    error_count: int = Field(..., description="Total errors")
+
+class ServiceEdge(BaseModel):
+    """Edge between services in service map"""
+    source: str = Field(..., description="Source service")
+    target: str = Field(..., description="Target service")
+    request_count: int = Field(..., description="Number of requests")
+
+class ServiceMap(BaseModel):
+    """Service dependency graph"""
+    nodes: List[Dict[str, Any]] = Field(..., description="Service nodes")
+    edges: List[Dict[str, Any]] = Field(..., description="Service connections")
+
+class ServiceCatalogEntry(BaseModel):
+    """Service catalog entry with RED metrics"""
+    name: str = Field(..., description="Service name")
+    request_rate: float = Field(..., description="Requests per second")
+    error_rate: float = Field(..., description="Error rate percentage")
+    avg_duration: float = Field(..., description="Average request duration in ms")
+    p95_duration: Optional[float] = Field(None, description="95th percentile duration")
+    p99_duration: Optional[float] = Field(None, description="99th percentile duration")
+
+class StatsResponse(BaseModel):
+    """Overall system statistics"""
+    trace_count: int = Field(..., description="Total number of traces")
+    span_count: int = Field(..., description="Total number of spans")
+    log_count: int = Field(..., description="Total number of logs")
+    metric_count: int = Field(..., description="Total number of unique metrics")
+    service_count: Optional[int] = Field(None, description="Number of services")
+
 app = FastAPI(
-    title="TinyOlly", 
+    title="TinyOlly",
     version="2.0.0",
-    description="Lightweight OpenTelemetry-native observability backend for logs, metrics & traces",
-    default_response_class=ORJSONResponse,  # Use faster JSON serialization
+    description="""
+# TinyOlly - Lightweight OpenTelemetry Observability Platform
+
+TinyOlly is a lightweight OpenTelemetry-native observability backend built from scratch 
+to visualize and correlate logs, metrics, and traces. Perfect for local development.
+
+## Features
+
+* 📊 **Traces** - Distributed tracing with span visualization
+* 📝 **Logs** - Structured logging with trace correlation  
+* 📈 **Metrics** - Time-series metrics with full OTLP support
+* 🗺️ **Service Map** - Auto-generated service dependency graphs
+* 🔍 **Service Catalog** - RED metrics (Rate, Errors, Duration)
+
+## OpenTelemetry Native
+
+All data is stored and returned in standard OpenTelemetry format, ensuring 
+compatibility with OTLP exporters and OpenTelemetry SDKs.
+    """,
+    default_response_class=ORJSONResponse,
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    contact={
+        "name": "TinyOlly Project",
+        "url": "https://github.com/tinyolly/tinyolly",
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
+    openapi_tags=[
+        {
+            "name": "Ingestion",
+            "description": "OTLP endpoints for ingesting telemetry data (traces, logs, metrics)"
+        },
+        {
+            "name": "Traces",
+            "description": "Query and retrieve trace data"
+        },
+        {
+            "name": "Spans",
+            "description": "Query and retrieve individual span data"
+        },
+        {
+            "name": "Logs",
+            "description": "Query and retrieve log entries with trace correlation"
+        },
+        {
+            "name": "Metrics",
+            "description": "Query and retrieve time-series metrics data"
+        },
+        {
+            "name": "Services",
+            "description": "Service catalog, service map, and RED metrics"
+        },
+        {
+            "name": "System",
+            "description": "Health checks and system status"
+        }
+    ]
 )
 
 # Add CORS middleware
@@ -57,9 +313,41 @@ storage = Storage()
 # Ingestion Endpoints
 # ============================================
 
-@app.post('/v1/traces', tags=["Ingestion"])
+@app.post(
+    '/v1/traces',
+    tags=["Ingestion"],
+    response_model=IngestResponse,
+    status_code=status.HTTP_200_OK,
+    operation_id="ingest_traces",
+    summary="Ingest traces",
+    responses={
+        200: {"description": "Traces successfully ingested"},
+        400: {"model": ErrorResponse, "description": "Invalid JSON payload"},
+        413: {"model": ErrorResponse, "description": "Payload too large (max 5MB)"}
+    }
+)
 async def ingest_traces(request: Request):
-    """Accept traces in OTLP JSON format (OpenTelemetry Protocol)"""
+    """
+    Accept traces in OTLP JSON format (OpenTelemetry Protocol).
+    
+    Supports both full OTLP format with `resourceSpans` or simplified format with `spans` array.
+    Maximum payload size is 5MB.
+    
+    **OTLP Format Example:**
+    ```json
+    {
+      "resourceSpans": [{
+        "scopeSpans": [{
+          "spans": [{
+            "traceId": "abc123",
+            "spanId": "span456",
+            "name": "GET /api/users"
+          }]
+        }]
+      }]
+    }
+    ```
+    """
     # Check content length
     content_length = request.headers.get('content-length')
     if content_length and int(content_length) > 5 * 1024 * 1024:
@@ -89,9 +377,38 @@ async def ingest_traces(request: Request):
     
     return {'status': 'ok'}
 
-@app.post('/v1/logs', tags=["Ingestion"])
+@app.post(
+    '/v1/logs',
+    tags=["Ingestion"],
+    response_model=IngestResponse,
+    status_code=status.HTTP_200_OK,
+    operation_id="ingest_logs",
+    summary="Ingest logs",
+    responses={
+        200: {"description": "Logs successfully ingested"},
+        400: {"model": ErrorResponse, "description": "Invalid JSON payload"},
+        413: {"model": ErrorResponse, "description": "Payload too large (max 5MB)"}
+    }
+)
 async def ingest_logs(request: Request):
-    """Accept logs in OTLP JSON format (OpenTelemetry Protocol)"""
+    """
+    Accept logs in OTLP JSON format (OpenTelemetry Protocol).
+    
+    Supports both array of logs or single log entry.
+    Maximum payload size is 5MB.
+    
+    **Example:**
+    ```json
+    [{
+      "timestamp": 1638360000,
+      "traceId": "trace-xyz",
+      "spanId": "span-abc",
+      "severityText": "INFO",
+      "body": "User logged in",
+      "attributes": {"user_id": "123"}
+    }]
+    ```
+    """
     content_length = request.headers.get('content-length')
     if content_length and int(content_length) > 5 * 1024 * 1024:
         raise HTTPException(status_code=413, detail='Payload too large')
@@ -114,9 +431,41 @@ async def ingest_logs(request: Request):
     
     return {'status': 'ok'}
 
-@app.post('/v1/metrics', tags=["Ingestion"])
+@app.post(
+    '/v1/metrics',
+    tags=["Ingestion"],
+    response_model=IngestResponse,
+    status_code=status.HTTP_200_OK,
+    operation_id="ingest_metrics",
+    summary="Ingest metrics",
+    responses={
+        200: {"description": "Metrics successfully ingested"},
+        400: {"model": ErrorResponse, "description": "Invalid JSON payload"},
+        413: {"model": ErrorResponse, "description": "Payload too large (max 5MB)"}
+    }
+)
 async def ingest_metrics(request: Request):
-    """Accept metrics in OTLP JSON format (OpenTelemetry Protocol)"""
+    """
+    Accept metrics in OTLP JSON format (OpenTelemetry Protocol).
+    
+    Supports both full OTLP format with `resourceMetrics` or simplified legacy format.
+    Maximum payload size is 5MB.
+    
+    **OTLP Format Example:**
+    ```json
+    {
+      "resourceMetrics": [{
+        "scopeMetrics": [{
+          "metrics": [{
+            "name": "http.server.duration",
+            "unit": "ms",
+            "histogram": {...}
+          }]
+        }]
+      }]
+    }
+    ```
+    """
     # Validate payload size (limit to 5MB)
     content_length = request.headers.get('content-length')
     if content_length and int(content_length) > 5 * 1024 * 1024:
@@ -149,9 +498,25 @@ async def ingest_metrics(request: Request):
 # Query Endpoints
 # ============================================
 
-@app.get('/api/traces', tags=["Traces"])
-async def get_traces(limit: int = Query(default=100, description="Maximum number of traces to return")):
-    """Get list of recent traces with summaries"""
+@app.get(
+    '/api/traces',
+    tags=["Traces"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_traces",
+    summary="Get recent traces",
+    responses={
+        200: {"description": "List of trace summaries"}
+    }
+)
+async def get_traces(
+    limit: int = Query(default=100, le=1000, description="Maximum number of traces to return (max 1000)")
+):
+    """
+    Get list of recent traces with summaries.
+    
+    Returns trace metadata including root service, operation name, duration, span count, 
+    and error status. Results are sorted by most recent first.
+    """
     # Get recent trace IDs from index
     trace_ids = await storage.get_recent_traces(limit)
     
@@ -163,9 +528,24 @@ async def get_traces(limit: int = Query(default=100, description="Maximum number
     
     return traces
 
-@app.get('/api/traces/{trace_id}', tags=["Traces"])
+@app.get(
+    '/api/traces/{trace_id}',
+    tags=["Traces"],
+    response_model=TraceDetail,
+    operation_id="get_trace_by_id",
+    summary="Get trace details",
+    responses={
+        200: {"description": "Complete trace with all spans"},
+        404: {"model": ErrorResponse, "description": "Trace not found"}
+    }
+)
 async def get_trace(trace_id: str):
-    """Get complete trace details with all spans and correlated logs"""
+    """
+    Get complete trace details with all spans and correlated logs.
+    
+    Returns full trace information including all spans sorted by start time,
+    with full OpenTelemetry span data (attributes, status, events, links, etc.).
+    """
     spans = await storage.get_trace_spans(trace_id)
     
     if not spans:
@@ -180,12 +560,26 @@ async def get_trace(trace_id: str):
         'span_count': len(spans)
     }
 
-@app.get('/api/spans', tags=["Spans"])
+@app.get(
+    '/api/spans',
+    tags=["Spans"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_spans",
+    summary="Get recent spans",
+    responses={
+        200: {"description": "List of span details"}
+    }
+)
 async def get_spans(
-    limit: int = Query(default=100, description="Maximum number of spans to return"),
+    limit: int = Query(default=100, le=1000, description="Maximum number of spans to return (max 1000)"),
     service: Optional[str] = Query(default=None, description="Filter by service name")
 ):
-    """Get list of recent spans with optional service filter"""
+    """
+    Get list of recent spans with optional service filter.
+    
+    Returns individual span details including service name, operation, duration, and attributes.
+    Can be filtered by service name for service-specific queries.
+    """
     # Get recent span IDs from index
     span_ids = await storage.get_recent_spans(limit * 3 if service else limit)  # Get more if filtering
     
@@ -203,18 +597,62 @@ async def get_spans(
     
     return spans
 
-@app.get('/api/logs', tags=["Logs"])
+@app.get(
+    '/api/logs',
+    tags=["Logs"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_logs",
+    summary="Get recent logs",
+    responses={
+        200: {"description": "List of log entries"}
+    }
+)
 async def get_logs(
     trace_id: Optional[str] = Query(default=None, description="Filter by trace ID for correlation"),
-    limit: int = Query(default=100, description="Maximum number of logs to return")
+    limit: int = Query(default=100, le=1000, description="Maximum number of logs to return (max 1000)")
 ):
-    """Get recent logs with optional trace ID filter for correlation"""
+    """
+    Get recent logs with optional trace ID filter for correlation.
+    
+    Returns log entries with full OpenTelemetry log data including timestamp, severity, body, 
+    and attributes. When trace_id is provided, returns only logs associated with that trace 
+    for distributed trace correlation.
+    """
     logs = await storage.get_logs(trace_id, limit)
     return logs
 
-@app.get('/api/logs/stream', tags=["Logs"])
+@app.get(
+    '/api/logs/stream',
+    tags=["Logs"],
+    operation_id="stream_logs",
+    summary="Stream logs in real-time",
+    responses={
+        200: {
+            "description": "Server-Sent Events stream of log entries",
+            "content": {
+                "text/event-stream": {
+                    "example": "data: {\"log_id\": \"123\", \"body\": \"User logged in\"}\n\n"
+                }
+            }
+        }
+    }
+)
 async def stream_logs():
-    """Server-Sent Events (SSE) stream for real-time log monitoring"""
+    """
+    Server-Sent Events (SSE) stream for real-time log monitoring.
+    
+    Opens a persistent connection that streams new log entries as they arrive.
+    Perfect for live log tailing and real-time monitoring dashboards.
+    
+    **Usage Example:**
+    ```javascript
+    const eventSource = new EventSource('/api/logs/stream');
+    eventSource.onmessage = (event) => {
+      const log = JSON.parse(event.data);
+      console.log(log);
+    };
+    ```
+    """
     async def event_generator():
         last_check = time.time()
         sent_log_ids = set()
@@ -251,9 +689,26 @@ async def stream_logs():
         }
     )
 
-@app.get('/api/metrics', tags=["Metrics"])
-async def get_metrics(limit: Optional[int] = Query(default=None, description="Maximum number of metrics to return")):
-    """Get list of all metrics with OpenTelemetry metadata (type, unit, description, resources)"""
+@app.get(
+    '/api/metrics',
+    tags=["Metrics"],
+    response_model=List[MetricMetadata],
+    operation_id="get_metrics",
+    summary="Get all metrics",
+    responses={
+        200: {"description": "List of all available metrics with metadata"}
+    }
+)
+async def get_metrics(
+    limit: Optional[int] = Query(default=None, le=1000, description="Maximum number of metrics to return (max 1000)")
+):
+    """
+    Get list of all metrics with OpenTelemetry metadata.
+    
+    Returns metric metadata including name, type (gauge, counter, histogram, etc.), 
+    unit, description, and cardinality information (number of unique resource and 
+    attribute combinations).
+    """
     names = await storage.get_metric_names(limit=limit)
     
     async def fetch_metric_details(name):
@@ -278,13 +733,32 @@ async def get_metrics(limit: Optional[int] = Query(default=None, description="Ma
     
     return metrics_list
 
-@app.get('/api/metrics/{name}', tags=["Metrics"])
+@app.get(
+    '/api/metrics/{name}',
+    tags=["Metrics"],
+    response_model=MetricDetail,
+    operation_id="get_metric_detail",
+    summary="Get metric time series",
+    responses={
+        200: {"description": "Metric time series data with all resources and attributes"}
+    }
+)
 async def get_metric_detail(
     name: str,
-    start: float = Query(default=None, description="Start time (Unix timestamp)"),
-    end: float = Query(default=None, description="End time (Unix timestamp)")
+    start: float = Query(default=None, description="Start time (Unix timestamp). Default: 10 minutes ago"),
+    end: float = Query(default=None, description="End time (Unix timestamp). Default: now")
 ):
-    """Get detailed time series data for a metric including resources, attributes, and exemplars (trace correlation)"""
+    """
+    Get detailed time series data for a metric.
+    
+    Returns complete time series including resources, attributes, and exemplars for trace 
+    correlation. Each series represents a unique combination of resource attributes and 
+    metric labels.
+    
+    **Time Range:**
+    - Default: Last 10 minutes
+    - Custom: Specify `start` and `end` Unix timestamps
+    """
     start_time = start if start is not None else time.time() - 600
     end_time = end if end is not None else time.time()
     
@@ -302,14 +776,36 @@ async def get_metric_detail(
         'series': series
     }
 
-@app.get('/api/metrics/query', tags=["Metrics"])
+@app.get(
+    '/api/metrics/query',
+    tags=["Metrics"],
+    response_model=MetricQueryResult,
+    operation_id="query_metrics",
+    summary="Query metrics with filters",
+    responses={
+        200: {"description": "Filtered metric time series data"}
+    }
+)
 async def query_metrics(
     name: str = Query(..., description="Metric name"),
-    start: float = Query(default=None, description="Start time (Unix timestamp)"),
-    end: float = Query(default=None, description="End time (Unix timestamp)"),
+    start: float = Query(default=None, description="Start time (Unix timestamp). Default: 10 minutes ago"),
+    end: float = Query(default=None, description="End time (Unix timestamp). Default: now"),
     request: Request = None
 ):
-    """Query metrics with resource and attribute filters (use resource.* and attribute.* query params)"""
+    """
+    Query metrics with resource and attribute filters.
+    
+    Filters are specified using query parameters with special prefixes:
+    - `resource.*` - Filter by resource attributes (e.g., `resource.service.name=my-service`)
+    - `attribute.*` - Filter by metric labels (e.g., `attribute.http.method=GET`)
+    
+    **Example:**
+    ```
+    GET /api/metrics/query?name=http.server.duration&resource.service.name=frontend&attribute.http.method=GET
+    ```
+    
+    Returns only time series matching ALL specified filters.
+    """
     start_time = start if start is not None else time.time() - 600
     end_time = end if end is not None else time.time()
     
@@ -350,18 +846,54 @@ async def query_metrics(
         }
     }
 
-@app.get('/api/metrics/{name}/resources', tags=["Metrics"])
+@app.get(
+    '/api/metrics/{name}/resources',
+    tags=["Metrics"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_metric_resources",
+    summary="Get metric resources",
+    responses={
+        200: {"description": "List of unique resource attribute combinations"}
+    }
+)
 async def get_metric_resources(name: str):
-    """Get all unique resource attribute combinations for a metric"""
+    """
+    Get all unique resource attribute combinations for a metric.
+    
+    Returns all distinct resource attribute sets (service.name, host.name, etc.) 
+    that have emitted this metric. Useful for discovering what resources are 
+    reporting a particular metric.
+    """
     resources = await storage.get_all_resources(name)
     return resources
 
-@app.get('/api/metrics/{name}/attributes', tags=["Metrics"])
+@app.get(
+    '/api/metrics/{name}/attributes',
+    tags=["Metrics"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_metric_attributes",
+    summary="Get metric attributes",
+    responses={
+        200: {"description": "List of unique metric attribute combinations"}
+    }
+)
 async def get_metric_attributes(
     name: str,
     request: Request = None
 ):
-    """Get all unique metric attribute combinations, optionally filtered by resource (use resource.* query params)"""
+    """
+    Get all unique metric attribute combinations (labels).
+    
+    Returns all distinct metric label combinations for this metric.
+    Can be optionally filtered by resource using `resource.*` query parameters.
+    
+    **Example:**
+    ```
+    GET /api/metrics/http.server.duration/attributes?resource.service.name=frontend
+    ```
+    
+    This helps discover what label combinations exist and manage cardinality.
+    """
     # Parse resource filters from query params
     resource_filter = {}
     
@@ -377,28 +909,91 @@ async def get_metric_attributes(
     )
     return attributes
 
-@app.get('/api/service-map', tags=["Services"])
-async def get_service_map(limit: int = Query(default=500, description="Maximum number of traces to analyze")):
-    """Get service dependency graph showing connections between services"""
+@app.get(
+    '/api/service-map',
+    tags=["Services"],
+    response_model=ServiceMap,
+    operation_id="get_service_map",
+    summary="Get service dependency graph",
+    responses={
+        200: {"description": "Service dependency graph with nodes and edges"}
+    }
+)
+async def get_service_map(
+    limit: int = Query(default=500, le=5000, description="Maximum number of traces to analyze (max 5000)")
+):
+    """
+    Get service dependency graph showing connections between services.
+    
+    Analyzes recent traces to build a directed graph of service-to-service 
+    communication patterns. Returns nodes (services) and edges (calls between services)
+    with request counts and error rates.
+    
+    Perfect for visualizing microservice architectures and understanding dependencies.
+    """
     graph = await storage.get_service_graph(limit)
     return graph
 
-@app.get('/api/service-catalog', tags=["Services"])
+@app.get(
+    '/api/service-catalog',
+    tags=["Services"],
+    response_model=List[Dict[str, Any]],
+    operation_id="get_service_catalog",
+    summary="Get service catalog with RED metrics",
+    responses={
+        200: {"description": "Service catalog with Rate, Errors, Duration metrics"}
+    }
+)
 async def get_service_catalog():
-    """Get service catalog with RED metrics (Rate, Errors, Duration)"""
+    """
+    Get service catalog with RED metrics (Rate, Errors, Duration).
+    
+    Returns all services discovered from traces with their golden signals:
+    - **Rate**: Requests per second
+    - **Errors**: Error rate percentage
+    - **Duration**: Average, P95, and P99 latency
+    
+    Essential for service health monitoring and SLO tracking.
+    """
     services = await storage.get_service_catalog()
     return services
 
-@app.get('/api/stats', tags=["Services"])
+@app.get(
+    '/api/stats',
+    tags=["Services"],
+    response_model=Dict[str, Any],
+    operation_id="get_stats",
+    summary="Get system statistics",
+    responses={
+        200: {"description": "Overall telemetry data statistics"}
+    }
+)
 async def get_stats():
-    """Get overall system statistics (traces, spans, logs, metrics counts)"""
+    """
+    Get overall system statistics.
+    
+    Returns aggregate counts for all telemetry data types:
+    - Total traces
+    - Total spans
+    - Total logs
+    - Total unique metrics
+    - Total services
+    
+    Useful for monitoring TinyOlly's data volume and health.
+    """
     return await storage.get_stats()
 
 # ============================================
 # Web UI Routes
 # ============================================
 
-@app.get('/', response_class=HTMLResponse, tags=["UI"], include_in_schema=False)
+@app.get(
+    '/',
+    response_class=HTMLResponse,
+    tags=["UI"],
+    include_in_schema=False,
+    operation_id="index"
+)
 async def index(request: Request):
     """Serve the main web UI dashboard"""
     deployment_env = os.getenv('DEPLOYMENT_ENV', 'unknown')
@@ -407,13 +1002,42 @@ async def index(request: Request):
         'deployment_env': deployment_env
     })
 
-@app.get('/health', tags=["System"])
+@app.get(
+    '/health',
+    tags=["System"],
+    response_model=HealthResponse,
+    operation_id="health_check",
+    summary="Health check",
+    responses={
+        200: {
+            "model": HealthResponse,
+            "description": "Service is healthy"
+        },
+        503: {
+            "model": HealthResponse,
+            "description": "Service is unhealthy - Redis disconnected"
+        }
+    }
+)
 async def health():
-    """Health check endpoint for monitoring and load balancers"""
+    """
+    Health check endpoint for monitoring and load balancers.
+    
+    Returns HTTP 200 when healthy, HTTP 503 when unhealthy.
+    Checks Redis connectivity to ensure the backend can store and retrieve data.
+    
+    Use this endpoint for:
+    - Kubernetes liveness/readiness probes
+    - Load balancer health checks
+    - Monitoring system uptime checks
+    """
     if await storage.is_connected():
         return {'status': 'healthy', 'redis': 'connected'}
     else:
-        raise HTTPException(status_code=503, detail={'status': 'unhealthy', 'redis': 'disconnected'})
+        raise HTTPException(
+            status_code=503,
+            detail={'status': 'unhealthy', 'redis': 'disconnected'}
+        )
 
 if __name__ == '__main__':
     import uvicorn

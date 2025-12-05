@@ -447,20 +447,46 @@ See [docs/CARDINALITY-PROTECTION.md](docs/CARDINALITY-PROTECTION.md) for detaile
 
 ## REST API & OpenAPI
 
-TinyOlly provides a comprehensive REST API for programmatic access to all telemetry data in **OpenTelemetry-native format**.
+TinyOlly provides a **fully documented, type-safe REST API** for programmatic access to all telemetry data in **OpenTelemetry-native format**.
 
 ### Interactive API Documentation
 
-Access the auto-generated OpenAPI documentation:
-- **Swagger UI**: `http://localhost:5005/docs` - Interactive API explorer
-- **ReDoc**: `http://localhost:5005/redoc` - Alternative documentation
-- **OpenAPI Spec**: `http://localhost:5005/openapi.json` - Machine-readable schema
+Access the comprehensive OpenAPI 3.0 documentation:
+- **Swagger UI**: `http://localhost:5005/docs` - Interactive API explorer with examples
+- **ReDoc**: `http://localhost:5005/redoc` - Clean, searchable documentation
+- **OpenAPI Spec**: `http://localhost:5005/openapi.json` - Machine-readable schema for code generation
+
+### API Features ✨
+
+- **📝 Fully Documented**: Every endpoint includes detailed descriptions, parameters, and examples
+- **✅ Type-Safe**: Pydantic models for request/response validation
+- **🏷️ Operation IDs**: Unique identifiers for all endpoints (perfect for code generation)
+- **📊 Response Models**: Explicit schemas for all responses with examples
+- **🔍 Organized Tags**: Endpoints categorized by function (Traces, Logs, Metrics, Services, etc.)
+- **⚡ Status Codes**: All possible HTTP responses documented
+- **🚀 SDK Generation**: Generate clients in any language using OpenAPI Generator
+
+### API Response Format
 
 All APIs return **OpenTelemetry-native JSON** with:
-- **Resources**: `service.name`, `host.name`, etc.
-- **Attributes**: Metric labels and span attributes
+- **Resources**: `service.name`, `host.name`, deployment environment, etc.
+- **Attributes**: Metric labels, span attributes, and log attributes
+- **Full Context**: Trace/span IDs, timestamps, status codes, and correlation data
 
-- **Full Context**: Trace/span IDs, timestamps, status codes
+### Generate API Clients
+
+```bash
+# Download OpenAPI spec
+curl http://localhost:5005/openapi.json > openapi.json
+
+# Generate Python client
+openapi-generator-cli generate -i openapi.json -g python -o ./tinyolly-client
+
+# Generate TypeScript client
+openapi-generator-cli generate -i openapi.json -g typescript-fetch -o ./tinyolly-ts-client
+```
+
+See [OPENAPI-IMPROVEMENTS.md](OPENAPI-IMPROVEMENTS.md) for details on the comprehensive OpenAPI enhancements.
 
 ## Technical Details
 
