@@ -5,12 +5,12 @@ and provides a web UI for visualization and correlation.
 Optimized with ORJSON, uvloop, and batch operations.
 """
 
-from fastapi import FastAPI, Request, HTTPException, Query, status
+from fastapi import FastAPI, Request, HTTPException, Query, status, APIRouter
 from fastapi.responses import JSONResponse, HTMLResponse, ORJSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.gzip import GZIPMiddleware
 from pydantic import BaseModel, Field
 import json
 import os
@@ -328,6 +328,28 @@ templates = Jinja2Templates(directory="templates")
 
 # Initialize storage
 storage = Storage()
+
+# ============================================
+# API Version Routers
+# ============================================
+
+# API Versioning Strategy:
+# - /v1/* - OTLP ingestion endpoints (already versioned)
+# - /api/* - Legacy query endpoints (backward compatible, no version prefix)
+# - /api/v1/* - New v1 query endpoints (recommended for new integrations)
+# - /api/v2/* - Future v2 endpoints for breaking changes
+#
+# Migration Path:
+# 1. Keep /api/* endpoints for backward compatibility
+# 2. Add new features to /api/v1/*
+# 3. Deprecate /api/* in favor of /api/v1/* over time
+# 4. Eventually introduce /api/v2/* for breaking changes
+
+# Create API v1 router
+api_v1_router = APIRouter(prefix="/api/v1", tags=["API v1"])
+
+# Note: Legacy /api/* endpoints remain for backward compatibility
+# All new development should use versioned /api/v1/* endpoints
 
 # ============================================
 # Ingestion Endpoints
@@ -1016,6 +1038,49 @@ async def get_stats():
     Useful for monitoring TinyOlly's data volume and health.
     """
     return await storage.get_stats()
+
+# ============================================
+# API v1 Versioned Endpoints
+# ============================================
+
+@api_v1_router.get(
+    '/traces',
+    response_model=List[Dict[str, Any]],
+    operation_id="get_traces_v1",
+    summary="Get recent traces (v1)",
+    description="Get list of recent traces. This is the v1 API endpoint."
+)
+async def get_traces_v1(
+    limit: int = Query(default=100, le=1000, description="Maximum number of traces to return (max 1000)")
+):
+    """Get list of recent traces (v1 endpoint)."""
+    trace_ids = await storage.get_recent_traces(limit)
+    traces = []
+    for trace_id in trace_ids:
+        summary = await storage.get_trace_summary(trace_id)
+        if summary:
+            traces.append(summary)
+    return traces
+
+@api_v1_router.get(
+    '/stats',
+    response_model=StatsResponse,
+    operation_id="get_stats_v1",
+    summary="Get system statistics (v1)"
+)
+async def get_stats_v1():
+    """Get overall system statistics (v1 endpoint)."""
+    stats = await storage.get_stats()
+    return {
+        'trace_count': stats.get('traces', 0),
+        'span_count': stats.get('spans', 0),
+        'log_count': stats.get('logs', 0),
+        'metric_count': stats.get('metrics', 0),
+        'service_count': None
+    }
+
+# Include the v1 router
+app.include_router(api_v1_router)
 
 # ============================================
 # Web UI Routes
