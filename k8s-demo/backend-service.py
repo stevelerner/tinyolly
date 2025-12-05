@@ -29,6 +29,7 @@ def log_json(level, message, **kwargs):
     getattr(logger, level)(json.dumps(log_data))
 
 app = Flask(__name__)
+app.config['SERVER_NAME'] = 'demo-backend:5000'
 
 @app.route('/check-inventory', methods=['POST'])
 def check_inventory():

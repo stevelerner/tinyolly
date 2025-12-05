@@ -184,6 +184,7 @@ memory_gauge = meter.create_observable_gauge(
 )
 
 app = Flask(__name__)
+app.config['SERVER_NAME'] = 'demo-frontend:5000'
 
 # Backend service URL
 BACKEND_URL = "http://demo-backend:5000"
