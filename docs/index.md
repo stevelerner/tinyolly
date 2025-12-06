@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/tinyollytitle.png" alt="TinyOlly" width="500"><br>  
+  <img src="images/tinyollytitle.png" alt="TinyOlly" width="500"><br>
   <b>The World's First Desktop Observability Platform</b>
 </div>  
 

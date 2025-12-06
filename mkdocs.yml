@@ -1,4 +1,5 @@
 site_name: TinyOlly Documentation
+site_url: https://tinyolly.github.io/tinyolly/
 site_description: BYOL (Bring Your Own Laptop) Observability Platform for OpenTelemetry
 site_author: TinyOlly
 repo_url: https://github.com/tinyolly/tinyolly
