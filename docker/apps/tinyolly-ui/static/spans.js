@@ -109,6 +109,12 @@ export function clearSpanFilter() {
     }
 }
 
+export function getServiceFilter() {
+    // Get service filter from URL or other source if needed
+    // For now, return null to load all spans
+    return null;
+}
+
 function showSpanDetail(spanId, spans) {
     let span = currentSpanData;
     if (!span || span.span_id !== spanId) {

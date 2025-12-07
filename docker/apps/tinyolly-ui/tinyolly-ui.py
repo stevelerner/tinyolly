@@ -750,21 +750,21 @@ async def get_spans(
     Can be filtered by service name for service-specific queries.
     """
     # Get recent span IDs from index
-    span_ids = await storage.get_recent_spans(limit * 3 if service else limit)  # Get more if filtering
+    max_span_ids = limit * 3 if service else limit
+    span_ids = await storage.get_recent_spans(max_span_ids)
     
-    spans = []
-    for span_id in span_ids:
-        span_data = await storage.get_span_details(span_id)
-        if span_data:
-            # Filter by service if requested
-            if service and span_data.get('service_name') != service:
-                continue
-            spans.append(span_data)
-            # Stop once we have enough
-            if len(spans) >= limit:
-                break
+    if not span_ids:
+        return []
     
-    return spans
+    # Use batch operation to fetch all span details at once (much faster)
+    all_spans = await storage.get_spans_details_batch(span_ids)
+    
+    # Filter by service if requested
+    if service:
+        all_spans = [s for s in all_spans if s.get('service_name') == service]
+    
+    # Return up to limit
+    return all_spans[:limit]
 
 @app.get(
     '/api/logs',

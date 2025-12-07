@@ -409,6 +409,79 @@ class Storage:
             logger.error(f"Error getting span details: {e}", exc_info=True)
             return None
 
+    async def get_spans_details_batch(self, span_ids: List[str]) -> List[Dict[str, Any]]:
+        """Get details for multiple spans efficiently using Redis pipeline.
+        
+        Args:
+            span_ids: List of span identifiers
+            
+        Returns:
+            List of span details dictionaries (may be shorter than input if some spans not found)
+        """
+        if not span_ids:
+            return []
+        
+        try:
+            client = await self.get_client()
+            pipe = client.pipeline()
+            
+            # Add all GET commands to pipeline
+            for span_id in span_ids:
+                span_key = f"span:{span_id}"
+                pipe.get(span_key)
+            
+            # Execute all commands at once
+            results = await pipe.execute()
+            
+            # Process results
+            spans = []
+            for span_id, span_data in zip(span_ids, results):
+                if not span_data:
+                    continue
+                
+                try:
+                    span = self._decompress_if_needed(span_data)
+                    
+                    # Extract attributes for display using centralized utility
+                    method = get_attr_value(span, ['http.method', 'http.request.method'])
+                    route = get_attr_value(span, ['http.route', 'http.target', 'url.path'])
+                    status_code = get_attr_value(span, ['http.status_code', 'http.response.status_code'])
+                    server_name = get_attr_value(span, ['http.server_name', 'net.host.name'])
+                    scheme = get_attr_value(span, ['http.scheme', 'url.scheme'])
+                    host = get_attr_value(span, ['http.host', 'net.host.name'])
+                    target = get_attr_value(span, ['http.target', 'url.path'])
+                    url = get_attr_value(span, ['http.url', 'url.full'])
+                    
+                    start_time = int(span.get('startTimeUnixNano', span.get('start_time', 0)))
+                    end_time = int(span.get('endTimeUnixNano', span.get('end_time', 0)))
+                    duration_ns = end_time - start_time if end_time > start_time else 0
+
+                    spans.append({
+                        'span_id': span_id,
+                        'trace_id': span.get('traceId') or span.get('trace_id'),
+                        'name': span.get('name', 'unknown'),
+                        'start_time': start_time,
+                        'duration_ms': duration_ns / 1_000_000,
+                        'method': method,
+                        'route': route,
+                        'status_code': status_code,
+                        'status': span.get('status', {}),
+                        'server_name': server_name,
+                        'scheme': scheme,
+                        'host': host,
+                        'target': target,
+                        'url': url,
+                        'service_name': span.get('serviceName', 'unknown')
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing span {span_id}: {e}", exc_info=True)
+                    continue
+            
+            return spans
+        except Exception as e:
+            logger.error(f"Error getting spans details batch: {e}", exc_info=True)
+            return []
+
     async def get_trace_spans(self, trace_id):
         """Get all spans for a trace"""
         trace_key = f"trace:{trace_id}:spans"

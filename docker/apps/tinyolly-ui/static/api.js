@@ -3,7 +3,7 @@
  */
 import { renderSpans, renderTraces, renderLogs, renderMetrics, renderServiceMap, renderStats } from './render.js';
 import { renderServiceCatalog } from './serviceCatalog.js';
-import { renderErrorState } from './utils.js';
+import { renderErrorState, renderLoadingState } from './utils.js';
 import { filterTinyOllyData, filterTinyOllyTrace, filterTinyOllyMetric, filterTinyOllyMetricSeries } from './filter.js';
 
 export async function loadStats() {
@@ -32,21 +32,46 @@ export async function loadTraces() {
 }
 
 export async function loadSpans(serviceName = null) {
+    const container = document.getElementById('spans-container');
+    if (!container) {
+        console.error('Spans container not found');
+        return;
+    }
+
+    // Show loading indicator immediately
+    container.innerHTML = renderLoadingState('Loading spans...');
+
     try {
         let url = '/api/spans?limit=50';
         if (serviceName) {
             url += `&service=${encodeURIComponent(serviceName)}`;
         }
+        
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         let spans = await response.json();
+
+        // Ensure spans is an array
+        if (!Array.isArray(spans)) {
+            console.error('Invalid spans response:', spans);
+            container.innerHTML = renderErrorState('Invalid response format');
+            return;
+        }
 
         // Filter out TinyOlly spans if hide toggle is active
         spans = spans.filter(filterTinyOllyData);
 
+        // Replace loading indicator with actual data
         renderSpans(spans);
     } catch (error) {
         console.error('Error loading spans:', error);
-        document.getElementById('spans-container').innerHTML = renderErrorState('Error loading spans');
+        if (container) {
+            container.innerHTML = renderErrorState('Error loading spans: ' + error.message);
+        }
     }
 }
 
