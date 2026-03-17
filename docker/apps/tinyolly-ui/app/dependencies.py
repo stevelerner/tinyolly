@@ -3,15 +3,14 @@
 from functools import lru_cache
 from tinyolly_common import Storage
 
-from .config import settings
 from .managers.websocket import ConnectionManager
 from .managers.alerts import AlertManager
 
 
 @lru_cache()
 def get_storage() -> Storage:
-    """Get Redis storage instance (singleton)"""
-    return Storage(host=settings.redis_host, port=settings.redis_port)
+    """Get storage instance (singleton)."""
+    return Storage()
 
 
 # Singleton instances

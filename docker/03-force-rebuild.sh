@@ -6,7 +6,7 @@ echo "=================================================="
 echo ""
 echo "This will:"
 echo "  1. Stop all running containers"
-echo "  2. Clear Redis data (traces, metrics, logs)"
+echo "  2. Clear SQLite data volume (traces, metrics, logs)"
 echo "  3. Clear cached collector config"
 echo "  4. Remove all images"
 echo "  5. Clear Docker build cache"
@@ -25,8 +25,8 @@ echo "Step 1: Stopping containers..."
 docker-compose -f docker-compose-tinyolly-core.yml down
 
 echo ""
-echo "Step 2: Clearing Redis data..."
-docker exec tinyolly-redis redis-cli -p 6579 FLUSHALL 2>/dev/null || true
+echo "Step 2: Clearing SQLite data volume..."
+docker volume rm tinyolly-db-data 2>/dev/null || true
 
 echo ""
 echo "Step 3: Clearing cached collector config..."

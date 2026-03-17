@@ -7,9 +7,11 @@ from typing import List
 class Settings:
     """Application settings loaded from environment variables"""
     
-    # Redis
-    redis_host: str = os.getenv("REDIS_HOST", "localhost")
-    redis_port: int = int(os.getenv("REDIS_PORT", "6579"))
+    # Storage
+    storage_backend: str = os.getenv("STORAGE_BACKEND", "sqlite")
+    sqlite_db_path: str = os.getenv("SQLITE_DB_PATH", "/data/tinyolly.db")
+    sqlite_ttl_seconds: int = int(os.getenv("SQLITE_TTL_SECONDS", os.getenv("REDIS_TTL", "1800")))
+    max_db_size_mb: int = int(os.getenv("MAX_DB_SIZE_MB", "256"))
     
     # Server
     port: int = int(os.getenv("PORT", "5002"))

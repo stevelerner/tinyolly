@@ -1,18 +1,4 @@
 services:
-  tinyolly-redis:
-    image: redis:7-alpine
-    container_name: tinyolly-redis
-    ports:
-      - "6579:6579"
-    command: redis-server --port 6579 --maxmemory 256mb --maxmemory-policy allkeys-lru
-    networks:
-      - tinyolly-core-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "-p", "6579", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   tinyolly-otlp-receiver:
     build:
       context: ../docker
@@ -20,16 +6,16 @@ services:
       args:
         - APP_DIR=tinyolly-otlp-receiver
     container_name: tinyolly-otlp-receiver
-    depends_on:
-      tinyolly-redis:
-        condition: service_healthy
     environment:
-      - REDIS_HOST=tinyolly-redis
-      - REDIS_PORT=6579
+      - STORAGE_BACKEND=sqlite
+      - SQLITE_DB_PATH=/data/tinyolly.db
+      - MAX_DB_SIZE_MB=256
       - DEPLOYMENT_ENV=docker-core
       - PORT=4343
     ports:
       - "4343:4343"
+    volumes:
+      - tinyolly-db-data:/data
     networks:
       - tinyolly-core-network
 
@@ -64,8 +50,6 @@ services:
     ports:
       - "5005:5002"  # Exposed on 5005 to avoid conflict if running alongside full demo
     depends_on:
-      tinyolly-redis:
-        condition: service_healthy
       tinyolly-otlp-receiver:
         condition: service_started
       tinyolly-opamp-server:
@@ -73,9 +57,11 @@ services:
     volumes:
       - ../docker/otelcol-configs/templates:/app/otelcol-templates:ro
       - ../docker/otelcol-configs/config.yaml:/app/otelcol-config.yaml:ro
+      - tinyolly-db-data:/data
     environment:
-      - REDIS_HOST=tinyolly-redis
-      - REDIS_PORT=6579
+      - STORAGE_BACKEND=sqlite
+      - SQLITE_DB_PATH=/data/tinyolly.db
+      - MAX_DB_SIZE_MB=256
       - DEPLOYMENT_ENV=docker-core
       - OPAMP_SERVER_URL=http://tinyolly-opamp-server:4321
       - OTELCOL_DEFAULT_CONFIG=/app/otelcol-config.yaml
@@ -92,4 +78,8 @@ services:
 networks:
   tinyolly-core-network:
     name: tinyolly-core-network
+
+volumes:
+  tinyolly-db-data:
+    name: tinyolly-db-data
 

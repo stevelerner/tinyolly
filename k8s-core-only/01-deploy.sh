@@ -9,7 +9,7 @@ kubectl apply -f otelcol-configs/templates/prometheus-remote-write.yaml
 
 # Apply manifests
 echo "Deploying services..."
-kubectl apply -f redis.yaml
+kubectl apply -f tinyolly-sqlite-pvc.yaml
 kubectl apply -f tinyolly-otlp-receiver.yaml
 kubectl apply -f tinyolly-opamp-server.yaml
 kubectl apply -f tinyolly-ui.yaml

@@ -16,7 +16,7 @@ export function renderTraces(traces) {
         return;
     }
 
-    const limitNote = traces.length >= 50 ? renderLimitNote(50, traces.length, 'Showing last 50 traces (older data available in Redis).') : '';
+    const limitNote = traces.length >= 50 ? renderLimitNote(50, traces.length, 'Showing last 50 traces (older data may still be available in storage).') : '';
 
     const headerRow = renderTableHeader([
         { label: 'Time', flex: '0 0 100px' },

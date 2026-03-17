@@ -41,16 +41,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo -e "${BLUE}Checking for TinyOlly resources...${NC}"
 RESOURCES_EXIST=false
 
-if kubectl get deployment tinyolly-redis &> /dev/null || \
-   kubectl get deployment tinyolly-otlp-receiver &> /dev/null || \
+if kubectl get deployment tinyolly-otlp-receiver &> /dev/null || \
    kubectl get deployment tinyolly-ui &> /dev/null || \
    kubectl get deployment tinyolly-opamp-server &> /dev/null || \
    kubectl get deployment otel-collector &> /dev/null || \
-   kubectl get service tinyolly-redis &> /dev/null || \
    kubectl get service tinyolly-otlp-receiver &> /dev/null || \
    kubectl get service tinyolly-ui &> /dev/null || \
    kubectl get service tinyolly-opamp-server &> /dev/null || \
    kubectl get service otel-collector &> /dev/null || \
+    kubectl get pvc tinyolly-db &> /dev/null || \
    kubectl get configmap otel-collector-config &> /dev/null || \
    kubectl get configmap otel-supervisor-config &> /dev/null || \
    kubectl get configmap otelcol-templates &> /dev/null; then
@@ -67,7 +66,7 @@ fi
 # Show resources that will be deleted
 echo -e "${YELLOW}The following resources will be deleted:${NC}"
 echo ""
-kubectl get deployments,services,configmaps 2>/dev/null | grep -E "(tinyolly-redis|tinyolly|otel-collector)" || echo "  (checking resources...)"
+kubectl get deployments,services,configmaps,pvc 2>/dev/null | grep -E "(tinyolly|otel-collector|tinyolly-db)" || echo "  (checking resources...)"
 echo ""
 
 # Confirm deletion
@@ -88,24 +87,23 @@ kubectl delete -f "$SCRIPT_DIR/tinyolly-ui.yaml" --ignore-not-found=true 2>/dev/
 kubectl delete -f "$SCRIPT_DIR/otel-collector.yaml" --ignore-not-found=true 2>/dev/null || true
 kubectl delete -f "$SCRIPT_DIR/tinyolly-opamp-server.yaml" --ignore-not-found=true 2>/dev/null || true
 kubectl delete -f "$SCRIPT_DIR/tinyolly-otlp-receiver.yaml" --ignore-not-found=true 2>/dev/null || true
-kubectl delete -f "$SCRIPT_DIR/redis.yaml" --ignore-not-found=true 2>/dev/null || true
+kubectl delete -f "$SCRIPT_DIR/tinyolly-sqlite-pvc.yaml" --ignore-not-found=true 2>/dev/null || true
 kubectl delete -f "$SCRIPT_DIR/otel-collector-config.yaml" --ignore-not-found=true 2>/dev/null || true
 echo ""
 
 # Method 2: Delete by resource names (fallback to ensure everything is deleted)
 echo -e "${YELLOW}→ Ensuring all deployments are deleted...${NC}"
-kubectl delete deployment tinyolly-redis --ignore-not-found=true 2>/dev/null || true
 kubectl delete deployment tinyolly-otlp-receiver --ignore-not-found=true 2>/dev/null || true
 kubectl delete deployment tinyolly-ui --ignore-not-found=true 2>/dev/null || true
 kubectl delete deployment tinyolly-opamp-server --ignore-not-found=true 2>/dev/null || true
 kubectl delete deployment otel-collector --ignore-not-found=true 2>/dev/null || true
 
 echo -e "${YELLOW}→ Ensuring all services are deleted...${NC}"
-kubectl delete service tinyolly-redis --ignore-not-found=true 2>/dev/null || true
 kubectl delete service tinyolly-otlp-receiver --ignore-not-found=true 2>/dev/null || true
 kubectl delete service tinyolly-ui --ignore-not-found=true 2>/dev/null || true
 kubectl delete service tinyolly-opamp-server --ignore-not-found=true 2>/dev/null || true
 kubectl delete service otel-collector --ignore-not-found=true 2>/dev/null || true
+kubectl delete pvc tinyolly-db --ignore-not-found=true 2>/dev/null || true
 
 echo -e "${YELLOW}→ Ensuring all configmaps are deleted...${NC}"
 kubectl delete configmap otel-collector-config --ignore-not-found=true 2>/dev/null || true
@@ -115,7 +113,6 @@ kubectl delete configmap otelcol-templates --ignore-not-found=true 2>/dev/null |
 # Wait for pods to terminate
 echo ""
 echo -e "${BLUE}Waiting for pods to terminate...${NC}"
-kubectl wait --for=delete pod -l app=tinyolly-redis --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-otlp-receiver --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-ui --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-opamp-server --timeout=60s 2>/dev/null || true
@@ -126,10 +123,10 @@ echo -e "${BLUE}Verifying cleanup...${NC}"
 
 # Check if any resources still exist
 REMAINING_RESOURCES=false
-if kubectl get deployment,service,configmap 2>/dev/null | grep -qE "(tinyolly-redis|tinyolly|otel-collector)"; then
+if kubectl get deployment,service,configmap,pvc 2>/dev/null | grep -qE "(tinyolly|otel-collector|tinyolly-db)"; then
     REMAINING_RESOURCES=true
     echo -e "${YELLOW}Warning: Some resources may still exist:${NC}"
-    kubectl get deployment,service,configmap 2>/dev/null | grep -E "(tinyolly-redis|tinyolly|otel-collector)" || true
+    kubectl get deployment,service,configmap,pvc 2>/dev/null | grep -E "(tinyolly|otel-collector|tinyolly-db)" || true
 else
     echo -e "${GREEN}✓ All TinyOlly resources have been deleted${NC}"
 fi

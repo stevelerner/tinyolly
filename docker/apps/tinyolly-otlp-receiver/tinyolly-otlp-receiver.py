@@ -1,6 +1,6 @@
 """
 TinyOlly OTLP Receiver - gRPC Implementation with Async Storage
-Receives OTLP data from OpenTelemetry Collector via gRPC and stores in Redis
+Receives OTLP data from OpenTelemetry Collector via gRPC and stores in TinyOlly storage
 Optimized with Batch Operations and uvloop
 """
 import grpc
@@ -189,9 +189,9 @@ def serve(port=4343):
     
     logger.info(f"TinyOlly OTLP Receiver (gRPC) starting on port {port}...")
     
-    # Check Redis connection asynchronously
-    redis_connected = run_async(storage.is_connected())
-    logger.info(f"Redis connection: {redis_connected}")
+    # Check storage connection asynchronously
+    storage_connected = run_async(storage.is_connected())
+    logger.info(f"Storage connection: {storage_connected}")
     
     server.start()
     logger.info("✓ Server started successfully")

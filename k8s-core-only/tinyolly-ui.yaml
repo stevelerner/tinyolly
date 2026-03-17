@@ -21,10 +21,12 @@ spec:
         ports:
         - containerPort: 5002
         env:
-        - name: REDIS_HOST
-          value: "tinyolly-redis"
-        - name: REDIS_PORT
-          value: "6579"
+        - name: STORAGE_BACKEND
+          value: "sqlite"
+        - name: SQLITE_DB_PATH
+          value: "/data/tinyolly.db"
+        - name: MAX_DB_SIZE_MB
+          value: "768"
         - name: DEPLOYMENT_ENV
           value: "kubernetes-core"
         - name: OTEL_SERVICE_NAME
@@ -48,6 +50,8 @@ spec:
         - name: OTELCOL_DEFAULT_CONFIG
           value: "/app/otelcol-config.yaml"
         volumeMounts:
+        - name: tinyolly-db
+          mountPath: /data
         - name: otelcol-config-vol
           mountPath: /app/otelcol-config.yaml
           subPath: otel-collector-config.yaml
@@ -77,6 +81,9 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
       volumes:
+      - name: tinyolly-db
+        persistentVolumeClaim:
+          claimName: tinyolly-db
       - name: otelcol-config-vol
         configMap:
           name: otel-collector-config

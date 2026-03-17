@@ -62,14 +62,14 @@ if ! kubectl apply -f "$SCRIPT_DIR/otelcol-configs/templates/prometheus-remote-w
     fi
 fi
 
-# 2. Apply Redis (base dependency)
-echo "  → Deploying Redis..."
-if ! kubectl apply -f "$SCRIPT_DIR/redis.yaml"; then
-    echo "    Error: Failed to apply redis.yaml"
+# 2. Apply SQLite PVC (base dependency)
+echo "  → Creating SQLite PVC..."
+if ! kubectl apply -f "$SCRIPT_DIR/tinyolly-sqlite-pvc.yaml"; then
+    echo "    Error: Failed to apply tinyolly-sqlite-pvc.yaml"
     FAILED=true
 fi
 
-# 3. Apply OTLP receiver (depends on Redis)
+# 3. Apply OTLP receiver
 echo "  → Deploying OTLP receiver..."
 if ! kubectl apply -f "$SCRIPT_DIR/tinyolly-otlp-receiver.yaml"; then
     echo "    Error: Failed to apply tinyolly-otlp-receiver.yaml"
@@ -90,7 +90,7 @@ if ! kubectl apply -f "$SCRIPT_DIR/otel-collector.yaml"; then
     FAILED=true
 fi
 
-# 6. Apply UI (depends on Redis, OTel Collector, and OpAMP server)
+# 6. Apply UI (depends on OTel Collector and OpAMP server)
 echo "  → Deploying TinyOlly UI..."
 if ! kubectl apply -f "$SCRIPT_DIR/tinyolly-ui.yaml"; then
     echo "    Error: Failed to apply tinyolly-ui.yaml"

@@ -23,15 +23,15 @@ router = APIRouter(prefix="/admin", tags=["System"])
     Get comprehensive TinyOlly performance and health metrics:
 
     - **Telemetry counts**: Traces, spans, logs, metrics
-    - **Redis memory usage**: Current, peak, RSS
+    - **DB usage**: SQLite file size, pages, limits
     - **Metric cardinality**: Current vs max, dropped count
-    - **Connection stats**: Total connections, commands processed
+    - **Process uptime**: Runtime duration
 
     Useful for monitoring TinyOlly's resource usage and performance.
     """
 )
 async def admin_stats(storage: Storage = Depends(get_storage)):
-    """Get detailed admin statistics including Redis memory and performance metrics"""
+    """Get detailed admin statistics including DB and performance metrics"""
     stats = await storage.get_admin_stats()
 
     # Add uptime calculation

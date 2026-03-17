@@ -20,13 +20,13 @@ class ErrorResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Health check response"""
     status: Literal["healthy", "unhealthy"]
-    redis: Literal["connected", "disconnected"]
+    storage: Literal["connected", "disconnected"]
     
     class Config:
         json_schema_extra = {
             "example": {
                 "status": "healthy",
-                "redis": "connected"
+                "storage": "connected"
             }
         }
 
@@ -221,9 +221,9 @@ class StatsResponse(BaseModel):
 
 
 class AdminStatsResponse(BaseModel):
-    """Detailed admin statistics including Redis and performance metrics"""
+    """Detailed admin statistics including DB and performance metrics"""
     telemetry: Dict[str, int] = Field(..., description="Telemetry data counts (traces, spans, logs, metrics)")
-    redis: Dict[str, Any] = Field(..., description="Redis memory and connection info")
+    db: Dict[str, Any] = Field(..., description="SQLite database size and page stats")
     cardinality: Dict[str, int] = Field(..., description="Metric cardinality stats")
     uptime: Optional[str] = Field(None, description="TinyOlly uptime")
 

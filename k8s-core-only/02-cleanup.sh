@@ -8,7 +8,7 @@ echo ""
 echo "Checking for TinyOlly resources..."
 echo "The following resources will be deleted:"
 echo ""
-kubectl get deployments,services,configmaps 2>/dev/null | grep -E "(tinyolly-redis|tinyolly|otel-collector)" || echo "  (checking resources...)"
+kubectl get deployments,services,configmaps,pvc 2>/dev/null | grep -E "(tinyolly|otel-collector|tinyolly-db)" || echo "  (checking resources...)"
 echo ""
 
 read -p "Do you want to proceed with cleanup? [y/N]:" confirm
@@ -25,7 +25,7 @@ echo "→ Deleting resources..."
 kubectl delete -f tinyolly-ui.yaml --ignore-not-found
 kubectl delete -f tinyolly-opamp-server.yaml --ignore-not-found
 kubectl delete -f tinyolly-otlp-receiver.yaml --ignore-not-found
-kubectl delete -f redis.yaml --ignore-not-found
+kubectl delete -f tinyolly-sqlite-pvc.yaml --ignore-not-found
 
 echo ""
 echo "→ Ensuring all configmaps are deleted..."
@@ -34,7 +34,6 @@ kubectl delete configmap otelcol-templates --ignore-not-found=true 2>/dev/null |
 
 echo ""
 echo "Waiting for pods to terminate..."
-kubectl wait --for=delete pod -l app=tinyolly-redis --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-otlp-receiver --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-opamp-server --timeout=60s 2>/dev/null || true
 kubectl wait --for=delete pod -l app=tinyolly-ui --timeout=60s 2>/dev/null || true

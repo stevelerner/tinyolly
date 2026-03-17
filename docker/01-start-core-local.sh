@@ -10,7 +10,7 @@ echo ""
 echo "Starting observability stack:"
 echo "  - OpenTelemetry Collector (listening on 4317/4318)"
 echo "  - TinyOlly OTLP Receiver"
-echo "  - Redis"
+echo "  - SQLite (embedded DB)"
 echo "  - TinyOlly Frontend (web UI)"
 echo ""
 
@@ -32,15 +32,15 @@ echo ""
 echo "Clearing cached collector config..."
 docker volume rm tinyolly-otel-supervisor-data 2>/dev/null || true
 
-# Clear Redis data from previous runs
+# Clear SQLite data from previous runs
 # This removes stale traces, metrics, and logs for a clean start
-echo "Clearing Redis data..."
-docker exec tinyolly-redis redis-cli -p 6579 FLUSHALL 2>/dev/null || true
+echo "Clearing SQLite data volume..."
+docker volume rm tinyolly-db-data 2>/dev/null || true
 
 # Use docker-compose with local build config
 # --build forces rebuild of all images
 # --force-recreate ensures config file changes are picked up
-docker-compose -f docker-compose-tinyolly-core-local.yml up -d --build --force-recreate 2>&1
+docker-compose -f docker-compose-tinyolly-core-local.yml up -d --build --force-recreate --remove-orphans 2>&1
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then

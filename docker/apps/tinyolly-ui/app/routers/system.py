@@ -56,7 +56,7 @@ async def index(request: Request):
         },
         503: {
             "model": HealthResponse,
-            "description": "Service is unhealthy - Redis disconnected"
+            "description": "Service is unhealthy - storage disconnected"
         }
     }
 )
@@ -65,7 +65,7 @@ async def health(storage: Storage = Depends(get_storage)):
     Health check endpoint for monitoring and load balancers.
 
     Returns HTTP 200 when healthy, HTTP 503 when unhealthy.
-    Checks Redis connectivity to ensure the backend can store and retrieve data.
+    Checks storage connectivity to ensure the backend can store and retrieve data.
 
     Use this endpoint for:
     - Kubernetes liveness/readiness probes
@@ -73,11 +73,11 @@ async def health(storage: Storage = Depends(get_storage)):
     - Monitoring system uptime checks
     """
     if await storage.is_connected():
-        return {'status': 'healthy', 'redis': 'connected'}
+        return {'status': 'healthy', 'storage': 'connected'}
     else:
         raise HTTPException(
             status_code=503,
-            detail={'status': 'unhealthy', 'redis': 'disconnected'}
+            detail={'status': 'unhealthy', 'storage': 'disconnected'}
         )
 
 

@@ -21,10 +21,12 @@ spec:
         ports:
         - containerPort: 4343
         env:
-        - name: REDIS_HOST
-          value: "tinyolly-redis"
-        - name: REDIS_PORT
-          value: "6579"
+        - name: STORAGE_BACKEND
+          value: "sqlite"
+        - name: SQLITE_DB_PATH
+          value: "/data/tinyolly.db"
+        - name: MAX_DB_SIZE_MB
+          value: "768"
         - name: PORT
           value: "4343"
         - name: OTEL_SERVICE_NAME
@@ -58,6 +60,13 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+        volumeMounts:
+        - name: tinyolly-db
+          mountPath: /data
+      volumes:
+      - name: tinyolly-db
+        persistentVolumeClaim:
+          claimName: tinyolly-db
 ---
 apiVersion: v1
 kind: Service
